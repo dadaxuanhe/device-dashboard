@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>设备详情 - 设备监控看板</title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/layout.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/responsive.css">
+
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+
+  <style>
+    .device-hero {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 20px 24px; background: var(--bg-card);
+      border: 1px solid var(--border-color); border-radius: 12px; margin-bottom: 24px;
+    }
+    .device-hero .info { display: flex; flex-direction: column; gap: 4px; }
+    .device-hero .name { font-size: 24px; font-weight: 600; color: var(--text-primary); }
+    .device-hero .code { font-size: 14px; color: var(--text-secondary); }
+    .device-hero .status-badge {
+      display: flex; align-items: center; gap: 8px; padding: 8px 20px;
+      border-radius: 20px; font-size: 16px; font-weight: 500;
+    }
+    .device-hero .status-badge .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .device-hero .status-badge.running { background: rgba(0,230,118,0.15); color: #00e676; }
+    .device-hero .status-badge.running .dot { background: #00e676; }
+    .device-hero .status-badge.idle { background: rgba(255,215,64,0.15); color: #ffd740; }
+    .device-hero .status-badge.idle .dot { background: #ffd740; }
+    .device-hero .status-badge.fault { background: rgba(255,23,68,0.15); color: #ff1744; }
+    .device-hero .status-badge.fault .dot { background: #ff1744; }
+    .device-hero .status-badge.offline { background: rgba(84,110,122,0.15); color: #546e7a; }
+    .device-hero .status-badge.offline .dot { background: #546e7a; }
+
+    .device-meta {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px; margin-bottom: 24px;
+    }
+    .device-meta .meta-item {
+      padding: 12px 16px; background: var(--bg-card);
+      border-radius: 8px; border: 1px solid var(--border-color);
+    }
+    .device-meta .meta-item .label { font-size: 12px; color: var(--text-secondary); }
+    .device-meta .meta-item .value { font-size: 16px; font-weight: 500; color: var(--text-primary); margin-top: 2px; }
+
+    .params-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px; margin-bottom: 24px;
+    }
+    .param-card {
+      padding: 16px 20px; background: var(--bg-card);
+      border: 1px solid var(--border-color); border-radius: 12px;
+    }
+    .param-card .param-name { font-size: 13px; color: var(--text-secondary); }
+    .param-card .param-value { font-size: 28px; font-weight: 700; color: var(--text-primary); margin: 4px 0 8px 0; }
+    .param-card .param-unit { font-size: 14px; font-weight: 400; color: var(--text-secondary); margin-left: 4px; }
+
+    .param-bar { width: 100%; height: 6px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
+    .param-bar .fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+    .param-bar .fill.normal { background: #00e676; }
+    .param-bar .fill.warning { background: #ffd740; }
+    .param-bar .fill.danger { background: #ff1744; }
+    .param-threshold { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+    .param-status { font-size: 12px; margin-top: 4px; }
+    .param-status.normal { color: #00e676; }
+    .param-status.warning { color: #ffd740; }
+    .param-status.danger { color: #ff1744; }
+
+    .detail-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .detail-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; }
+    .detail-card .card-title { font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px; }
+    .detail-card .chart-container { width: 100%; height: 220px; }
+
+    .maintenance-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .maintenance-table th { text-align: left; padding: 8px 10px; color: var(--text-secondary); border-bottom: 1px solid var(--border-color); font-weight: 500; }
+    .maintenance-table td { padding: 8px 10px; color: var(--text-primary); border-bottom: 1px solid rgba(42,58,92,0.3); }
+    .maintenance-table tr:last-child td { border-bottom: none; }
+    .maintenance-table .empty { text-align: center; color: var(--text-secondary); padding: 24px 0; }
+
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
+      background: transparent; border: 1px solid var(--border-color); border-radius: 6px;
+      color: var(--text-secondary); cursor: pointer; transition: all 0.3s;
+      font-size: 14px; margin-bottom: 16px;
+    }
+    .back-btn:hover { border-color: var(--color-primary); color: var(--text-primary); }
+
+    .section-title { color: var(--text-primary); margin-bottom: 12px; font-size: 1.1rem; font-weight: 600; }
+
+    /* ===== 同类型设备快速切换 ===== */
+    .other-devices {
+      margin-top: 24px;
+      padding: 20px 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+    }
+    .other-devices .section-title { margin-bottom: 16px; }
+    .other-devices-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .other-device-card {
+      display: block;
+      padding: 14px 16px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      text-decoration: none;
+      color: var(--text-primary);
+      transition: all 0.25s ease;
+      background: var(--bg-secondary);
+    }
+    .other-device-card:hover {
+      border-color: var(--color-primary);
+      background: rgba(59,130,246,0.08);
+    }
+    .other-device-card .dev-name {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    .other-device-card .dev-code {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    .other-device-card .dev-status {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 1px 10px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .other-device-card .dev-status.running { background: rgba(0,230,118,0.15); color: #00e676; }
+    .other-device-card .dev-status.idle { background: rgba(255,215,64,0.15); color: #ffd740; }
+    .other-device-card .dev-status.fault { background: rgba(255,23,68,0.15); color: #ff1744; }
+    .other-device-card .dev-status.offline { background: rgba(84,110,122,0.15); color: #546e7a; }
+
+    @media (max-width: 767px) {
+      .device-hero { flex-direction: column; align-items: flex-start; gap: 12px; padding: 16px; }
+      .device-hero .name { font-size: 20px; }
+      .params-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .param-card .param-value { font-size: 22px; }
+      .detail-grid { grid-template-columns: 1fr; }
+      .detail-card .chart-container { height: 180px; }
+      .device-meta { grid-template-columns: 1fr 1fr; }
+    }
+    @media (min-width: 768px) and (max-width: 1023px) {
+      .params-grid { grid-template-columns: repeat(4, 1fr); }
+      .detail-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <!-- ===== 加载进度条 ===== -->
+  <div id="pageLoader" style="position:fixed;inset:0;z-index:99999;background:#0a0e17;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.5s ease;">
+    <div style="width:280px;max-width:80%;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+        <div style="width:40px;height:40px;border:3px solid rgba(108,63,245,0.3);border-top-color:#6C3FF5;border-radius:50%;animation:loaderSpin 0.8s linear infinite;"></div>
+        <div><div style="font-size:18px;font-weight:600;color:#e8edf5;">智能看板</div><div style="font-size:13px;color:#6a7588;margin-top:2px;">正在加载...</div></div>
+      </div>
+      <div style="height:4px;background:#1e293b;border-radius:4px;overflow:hidden;">
+        <div id="loaderBar" style="height:100%;width:0%;background:linear-gradient(90deg,#6C3FF5,#8b5cf6);border-radius:4px;transition:width 0.4s ease;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#5a6478;margin-top:6px;">
+        <span id="loaderStatus">初始化...</span>
+        <span id="loaderPercent">0%</span>
+      </div>
+    </div>
+  </div>
+  <style>@keyframes loaderSpin{to{transform:rotate(360deg)}}#pageLoader.hide{opacity:0;pointer-events:none}</style>
+  <script>
+    (function(){var L=document.getElementById('pageLoader'),B=document.getElementById('loaderBar'),S=document.getElementById('loaderStatus'),P=document.getElementById('loaderPercent'),p=0;
+    function setP(pct,msg){p=Math.min(pct,100);if(B)B.style.width=p+'%';if(P)P.textContent=p+'%';if(S&&msg)S.textContent=msg;}
+    var steps={css:false,fonts:false,dom:false,api:false};
+    function check(){if(steps.css&&steps.fonts&&steps.dom&&steps.api){setP(100,'加载完成');setTimeout(function(){L.classList.add('hide')},400);}}
+    setP(5,'正在连接...');
+    document.querySelectorAll('link[rel="stylesheet"]').forEach(function(l){if(l.sheet){steps.css=true;setP(25,'样式加载完成');check();return;}l.addEventListener('load',function(){steps.css=true;setP(25,'样式加载完成');check();});});
+    if(document.readyState!=='loading'){steps.dom=true;setP(35,'页面结构就绪');check();}else document.addEventListener('DOMContentLoaded',function(){steps.dom=true;setP(35,'页面结构就绪');check();});
+    if(document.fonts)document.fonts.ready.then(function(){steps.fonts=true;setP(45,'字体就绪');check();});else{steps.fonts=true;setP(45,'');check();}
+    window.__loaderMarkApiReady=function(){steps.api=true;setP(80,'数据加载完成');check();};
+    setTimeout(function(){if(L&&!L.classList.contains('hide')){setP(100,'加载完成');setTimeout(function(){L.classList.add('hide')},400);}},10000);})();
+  </script>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/icons/logo.svg" alt="Logo" class="sidebar-logo">
+      <h1 class="sidebar-title">智能看板</h1>
+      <button class="sidebar-toggle" id="sidebarToggle">
+        <img src="../assets/icons/collapse.svg" alt="折叠">
+      </button>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../index.html" class="nav-item" data-page="dashboard">
+        <img src="../assets/icons/dashboard.svg" class="nav-icon">
+        <span class="nav-text">总览看板</span>
+      </a>
+      <a href="detail.html" class="nav-item active" data-page="detail">
+        <img src="../assets/icons/device.svg" class="nav-icon">
+        <span class="nav-text">设备管理</span>
+      </a>
+      <a href="alarms.html" class="nav-item" data-page="alarms">
+        <img src="../assets/icons/alarm.svg" class="nav-icon">
+        <span class="nav-text">告警管理</span>
+        <span class="nav-badge" id="alarmBadge" style="display:none;">0</span>
+      </a>
+      <a href="personnel.html" class="nav-item" data-page="personnel">
+        <img src="../assets/icons/user.svg" class="nav-icon">
+        <span class="nav-text">人员管理</span>
+      </a>
+      <a href="settings.html" class="nav-item" data-page="settings">
+        <img src="../assets/icons/settings.svg" class="nav-icon">
+        <span class="nav-text">系统设置</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="theme-toggle" id="themeToggle">
+        <i class="fas fa-moon" id="themeIcon"></i>
+        <span class="theme-label">暗色主题</span>
+      </button>
+    </div>
+  </aside>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <main class="main-content" id="mainContent">
+    <header class="topbar">
+      <div class="topbar__left">
+        <span class="topbar__hamburger" id="menuBtn"><i class="fas fa-bars"></i></span>
+        <span class="topbar__breadcrumb">首页 / <span>设备详情</span></span>
+      </div>
+      <div class="topbar__right">
+        <span class="topbar__clock" id="clock">--:--:--</span>
+        <button class="topbar__icon-btn" id="refreshBtn" title="刷新数据"><i class="fas fa-sync-alt"></i></button>
+      </div>
+    </header>
+
+    <div class="content-area" style="padding:0;">
+      <button class="back-btn" onclick="location.href='../index.html'">← 返回总览</button>
+
+      <div class="device-hero" id="deviceHero"></div>
+      <div class="device-meta" id="deviceMeta"></div>
+
+      <h3 class="section-title">📊 实时参数</h3>
+      <div class="params-grid" id="paramsGrid"></div>
+
+      <div class="detail-grid">
+        <div class="detail-card">
+          <div class="card-title">🌡️ 温度趋势</div>
+          <div id="detailTempChart" class="chart-container"></div>
+        </div>
+        <div class="detail-card">
+          <div class="card-title">🔧 维修历史</div>
+          <div id="maintenanceList"></div>
+        </div>
+      </div>
+
+      <!-- ===== 同类型设备快速切换 ===== -->
+      <div class="other-devices" id="otherDevicesSection" style="display:none;">
+        <h3 class="section-title">📋 其他设备</h3>
+        <div class="other-devices-grid" id="otherDevicesGrid"></div>
+      </div>
+    </div>
+  </main>
+
+  <script src="../js/utils.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    var equipmentId = new URLSearchParams(window.location.search).get('id') || 1;
+    var chartInstance = null;
+
+    function renderTrendChart(data) {
+      var dom = document.getElementById('detailTempChart');
+      if (!dom) return;
+      if (!chartInstance) chartInstance = echarts.init(dom, 'dark');
+      var option = {
+        tooltip: { trigger: 'axis', position: function(point, params, dom, rect, size) { var x = point[0] - size.contentSize[0] / 2; x = Math.max(4, Math.min(x, size.viewSize[0] - size.contentSize[0] - 4)); return [x, -size.contentSize[1] - 8]; }, formatter: function(p) { return '<strong>' + p[0].axisValue + '</strong><br/>温度：' + p[0].value + '℃'; } },
+        grid: { left: 70, right: 20, top: 20, bottom: 30 },
+        xAxis: { type: 'category', data: data.map(function(d){return d.time;}), axisLine: {lineStyle:{color:'#2a3a5c'}}, axisLabel: {color:'#8899bb',fontSize:11} },
+        yAxis: {
+          type: 'value',
+          name: '温度（℃）',
+          nameLocation: 'middle',
+          nameGap: 50,
+          nameTextStyle: { color: '#8899bb', fontSize: 11 },
+          splitLine: { lineStyle: { color: '#1a2335' } },
+          axisLabel: { color: '#8899bb' }
+        },
+        series: [{ type: 'line', data: data.map(function(d){return d.value;}), smooth: true, symbol: 'circle', symbolSize: 6, lineStyle: {color:'#00bcd4',width:2}, areaStyle: { color: { type:'linear', x:0, y:0, x2:0, y2:1, colorStops:[{offset:0,color:'rgba(0,188,212,0.3)'},{offset:1,color:'rgba(0,188,212,0)'}] } } }]
+      };
+      chartInstance.setOption(option, true);
+      chartInstance.resize();
+    }
+
+    function renderDeviceHero(device) {
+      var container = document.getElementById('deviceHero');
+      var statusText = getStatusText(device.status);
+      container.innerHTML =
+        '<div class="info"><div class="name">' + device.name + '</div><div class="code">' + device.equipmentNo + ' | ' + device.type + ' | ' + device.model + '</div></div>' +
+        '<div class="status-badge ' + device.status + '"><span class="dot"></span>' + statusText + ' · OEE ' + device.oee + '% · 今日产量 ' + device.currentOutput + '件</div>';
+    }
+
+    function renderDeviceMeta(device) {
+      document.getElementById('deviceMeta').innerHTML =
+        '<div class="meta-item"><div class="label">设备型号</div><div class="value">' + (device.model||'--') + '</div></div>' +
+        '<div class="meta-item"><div class="label">制造商</div><div class="value">' + (device.manufacturer||'--') + '</div></div>' +
+        '<div class="meta-item"><div class="label">所在位置</div><div class="value">' + (device.location||'--') + '</div></div>' +
+        '<div class="meta-item"><div class="label">投产日期</div><div class="value">' + (device.installDate||'--') + '</div></div>';
+    }
+
+    function renderParams(device) {
+      var params = [
+        { key:'temperature', label:'温度', value:device.temperature, unit:'℃', min:device.thresholds.temperature.min, max:device.thresholds.temperature.max },
+        { key:'current', label:'电流', value:device.current, unit:'A', min:device.thresholds.current.min, max:device.thresholds.current.max },
+        { key:'voltage', label:'电压', value:device.voltage, unit:'V', min:device.thresholds.voltage.min, max:device.thresholds.voltage.max },
+        { key:'pressure', label:'压力', value:device.pressure, unit:'MPa', min:device.thresholds.pressure.min, max:device.thresholds.pressure.max }
+      ];
+      document.getElementById('paramsGrid').innerHTML = params.map(function(p) {
+        var range = p.max - p.min;
+        var percent = Math.max(0, Math.min(100, ((p.value - p.min) / range) * 100));
+        var status = 'normal', statusText = '正常';
+        if (p.value < p.min || p.value > p.max) { status = 'danger'; statusText = '⚠️ 超阈值'; }
+        else if (p.value < p.min + range * 0.1 || p.value > p.max - range * 0.1) { status = 'warning'; statusText = '⚠️ 接近阈值'; }
+        return '<div class="param-card"><div class="param-name">' + p.label + '</div><div class="param-value">' + p.value + '<span class="param-unit">' + p.unit + '</span></div>' +
+          '<div class="param-bar"><div class="fill ' + status + '" style="width:' + percent + '%;"></div></div>' +
+          '<div class="param-threshold"><span>' + p.min + p.unit + '</span><span>' + p.max + p.unit + '</span></div>' +
+          '<div class="param-status ' + status + '">' + statusText + '</div></div>';
+      }).join('');
+    }
+
+    function renderMaintenance(history) {
+      var container = document.getElementById('maintenanceList');
+      if (!history || history.length === 0) {
+        container.innerHTML = '<table class="maintenance-table"><tbody><tr><td class="empty">✅ 暂无维修记录</td></tr></tbody></table>';
+        return;
+      }
+      container.innerHTML = '<table class="maintenance-table"><thead><tr><th>日期</th><th>故障描述</th><th>维修措施</th><th>维修人</th><th>耗时(h)</th></tr></thead><tbody>' +
+        history.map(function(item) { return '<tr><td>' + item.date + '</td><td>' + item.faultDesc + '</td><td>' + item.measure + '</td><td>' + item.handler + '</td><td>' + item.hours + '</td></tr>'; }).join('') +
+        '</tbody></table>';
+    }
+
+    async function loadDetail() {
+      try {
+        var device = await getEquipmentDetail(parseInt(equipmentId));
+        renderDeviceHero(device);
+        renderDeviceMeta(device);
+        renderParams(device);
+        renderMaintenance(device.maintenanceHistory);
+
+        var tempData = await getEquipmentTemperature(parseInt(equipmentId), { range: '7d' });
+        renderTrendChart(tempData);
+      // 加载其他设备列表（排除当前设备）
+      try {
+        var allDevices = await getEquipment();
+        renderOtherDevices(allDevices, parseInt(equipmentId));
+      } catch (e) {
+        console.error('加载其他设备列表失败:', e);
+      }
+      } catch (error) {
+        console.error('加载设备详情失败:', error);
+        document.getElementById('deviceHero').innerHTML = '<div class="info"><div class="name" style="color:#ff1744;">❌ 加载失败</div><div class="code">' + error.message + '</div></div>';
+      }
+      if (typeof window.__loaderMarkApiReady === 'function') window.__loaderMarkApiReady();
+    }
+
+    // ============================================================
+    // 渲染其他设备列表（过滤当前设备，最多 15 台）
+    // ============================================================
+    function renderOtherDevices(list, currentId) {
+      var container = document.getElementById('otherDevicesSection');
+      var grid = document.getElementById('otherDevicesGrid');
+
+      // 1. 过滤：移除当前正在查看的设备
+      var filteredList = (list || []).filter(function(dev) {
+        return dev.id !== currentId;
+      });
+
+      if (filteredList.length === 0) {
+        container.style.display = 'none';
+        return;
+      }
+
+      // 2. 限制最多显示 15 台，防止页面过长
+      var displayList = filteredList.slice(0, 15);
+
+      container.style.display = 'block';
+      grid.innerHTML = displayList.map(function(dev) {
+        var statusText = getStatusText ? getStatusText(dev.status) : dev.status;
+        return '<a class="other-device-card" href="detail.html?id=' + dev.id + '">' +
+          '<div class="dev-name">' + (dev.name || '--') + '</div>' +
+          '<div class="dev-code">' + (dev.equipmentNo || dev.code || '') + '</div>' +
+          '<span class="dev-status ' + (dev.status || '') + '">' + statusText + '</span>' +
+          '</a>';
+      }).join('');
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      initClock();
+      //initSidebar();
+      if (typeof initThemeToggle === 'function') initThemeToggle();
+      loadDetail();
+      setInterval(loadDetail, 60000);
+    });
+
+    window.addEventListener('resize', function() { if (chartInstance) chartInstance.resize(); });
+  </script>
+
+  <!-- 手机端底部Tab栏 -->
+  <nav class="bottom-tab-bar">
+    <a href="../index.html" class="tab-item">
+      <span class="tab-icon">📊</span>
+      <span>总览</span>
+    </a>
+    <a href="detail.html" class="tab-item active">
+      <span class="tab-icon">⚙️</span>
+      <span>设备</span>
+    </a>
+    <a href="alarms.html" class="tab-item">
+      <span class="tab-icon">🔔</span>
+      <span>告警</span>
+      <span class="tab-badge" id="mobileAlarmBadge" style="display:none;">0</span>
+    </a>
+    <a href="personnel.html" class="tab-item">
+      <span class="tab-icon">👤</span>
+      <span>人员</span>
+    </a>
+  </nav>
+
+</body>
+</html>

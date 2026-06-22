@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>系统设置 · 智能工厂</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/layout.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/responsive.css">
+  <style>
+    /* ===========================
+       设置页面专属样式
+       =========================== */
+
+    /* 卡片网格 — PC 2列，平板/手机 1列 */
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .settings-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      transition: all 0.2s ease;
+    }
+    .settings-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      border-color: var(--brand-purple, #6C3FF5);
+    }
+    .settings-card__title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .settings-card__title i {
+      color: var(--brand-purple, #6C3FF5);
+    }
+
+    /* 全宽卡片（表格） */
+    .settings-card--full {
+      grid-column: 1 / -1;
+    }
+
+    /* ===========================
+       表单标签与行
+       =========================== */
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+    }
+    .setting-row + .setting-row {
+      border-top: 1px solid var(--border-light);
+    }
+    .setting-label {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    /* ===========================
+       自定义 Select
+       =========================== */
+    .setting-select {
+      padding: 6px 28px 6px 12px;
+      background: var(--bg-input, var(--bg-secondary));
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      font-size: 13px;
+      outline: none;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238892a6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      min-width: 120px;
+    }
+    .setting-select:hover {
+      border-color: var(--brand-purple, #6C3FF5);
+    }
+    .setting-select:focus {
+      border-color: var(--brand-purple, #6C3FF5);
+      box-shadow: 0 0 0 2px rgba(108, 63, 245, 0.15);
+    }
+    .setting-select option {
+      background: var(--bg-card);
+      color: var(--text-primary);
+    }
+
+    /* ===========================
+       自定义 Radio 组件
+       =========================== */
+    .radio-group {
+      display: flex;
+      gap: 12px;
+    }
+    .radio-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text-secondary);
+      user-select: none;
+    }
+    .radio-label input[type="radio"] {
+      display: none;
+    }
+    .radio-custom {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid var(--text-muted);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .radio-label input[type="radio"]:checked + .radio-custom {
+      border-color: var(--brand-purple, #6C3FF5);
+    }
+    .radio-label input[type="radio"]:checked + .radio-custom::after {
+      content: '';
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--brand-purple, #6C3FF5);
+    }
+    .radio-label:hover .radio-custom {
+      border-color: var(--brand-purple, #6C3FF5);
+    }
+
+    /* ===========================
+       Toggle Switch 组件
+       =========================== */
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+    .toggle-switch input {
+      display: none;
+    }
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: var(--text-muted);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.25s;
+    }
+    .toggle-slider::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.25s;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    }
+    .toggle-switch input:checked + .toggle-slider {
+      background: var(--brand-purple, #6C3FF5);
+    }
+    .toggle-switch input:checked + .toggle-slider::after {
+      transform: translateX(20px);
+    }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+    }
+    .toggle-row + .toggle-row {
+      border-top: 1px solid var(--border-light);
+    }
+
+    /* ===========================
+       弹窗
+       =========================== */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6); z-index: 9999;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal-box {
+      background: var(--bg-card); border: 1px solid var(--border-color);
+      border-radius: 12px; padding: 24px; max-width: 420px; width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    #addUserModal input:focus, #addUserModal select:focus {
+      border-color: #6C3FF5 !important;
+      box-shadow: 0 0 0 2px rgba(108,63,245,0.15);
+    }
+
+    /* ===========================
+       按钮
+       =========================== */
+    .settings-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+    }
+    .btn-save {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 24px;
+      border: none;
+      border-radius: var(--radius-md);
+      background: var(--brand-purple, #6C3FF5);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn-save:hover { opacity: 0.85; }
+    .btn-reset {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 24px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-reset:hover {
+      border-color: var(--color-danger);
+      color: var(--color-danger);
+    }
+
+    /* ===========================
+       用户表格
+       =========================== */
+    .users-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    .users-table th {
+      text-align: left;
+      padding: 10px 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      border-bottom: 2px solid var(--border-color);
+      font-size: 13px;
+    }
+    .users-table td {
+      padding: 9px 12px;
+      color: var(--text-primary);
+      border-bottom: 1px solid var(--border-light);
+    }
+    .users-table tr:hover td {
+      background: var(--bg-card-hover);
+    }
+    .users-table .role-badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .users-table .role-badge.admin { background: rgba(108,63,245,0.15); color: #6C3FF5; }
+    .users-table .role-badge.engineer { background: rgba(0,188,212,0.15); color: #00bcd4; }
+    .users-table .role-badge.operator { background: rgba(0,230,118,0.15); color: #00e676; }
+    .loading-text, .empty-text {
+      text-align: center;
+      padding: 20px 0;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    .loading-text i { margin-right: 6px; }
+
+    /* ===========================
+       Toast 消息
+       =========================== */
+    #toastMessage {
+      position: fixed;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      padding: 12px 24px;
+      background: var(--color-success-bg, rgba(0,230,118,0.12));
+      color: var(--color-success, #00e676);
+      border: 1px solid var(--color-success, #00e676);
+      border-radius: var(--radius-md);
+      font-size: 14px;
+      font-weight: 500;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.4s ease;
+      z-index: 9999;
+      white-space: nowrap;
+    }
+    #toastMessage.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      pointer-events: auto;
+    }
+
+    /* ===========================
+       内容容器覆盖
+       =========================== */
+    .content-area {
+      padding: 0;
+    }
+    .content-area > .page-header {
+      margin-bottom: 20px;
+    }
+
+    /* ===========================
+       响应式
+       =========================== */
+    @media (max-width: 1023px) {
+      .settings-grid {
+        grid-template-columns: 1fr;
+      }
+      .settings-card--full {
+        grid-column: 1;
+      }
+    }
+    @media (max-width: 767px) {
+      .settings-card {
+        padding: 16px;
+      }
+      .radio-group {
+        flex-wrap: wrap;
+      }
+      .settings-actions {
+        flex-direction: column;
+      }
+      .btn-save, .btn-reset {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- ===== 加载进度条 ===== -->
+  <div id="pageLoader" style="position:fixed;inset:0;z-index:99999;background:#0a0e17;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.5s ease;">
+    <div style="width:280px;max-width:80%;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+        <div style="width:40px;height:40px;border:3px solid rgba(108,63,245,0.3);border-top-color:#6C3FF5;border-radius:50%;animation:loaderSpin 0.8s linear infinite;"></div>
+        <div><div style="font-size:18px;font-weight:600;color:#e8edf5;">智能看板</div><div style="font-size:13px;color:#6a7588;margin-top:2px;">正在加载...</div></div>
+      </div>
+      <div style="height:4px;background:#1e293b;border-radius:4px;overflow:hidden;">
+        <div id="loaderBar" style="height:100%;width:0%;background:linear-gradient(90deg,#6C3FF5,#8b5cf6);border-radius:4px;transition:width 0.4s ease;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#5a6478;margin-top:6px;">
+        <span id="loaderStatus">初始化...</span>
+        <span id="loaderPercent">0%</span>
+      </div>
+    </div>
+  </div>
+  <style>@keyframes loaderSpin{to{transform:rotate(360deg)}}#pageLoader.hide{opacity:0;pointer-events:none}</style>
+  <script>
+    (function(){var L=document.getElementById('pageLoader'),B=document.getElementById('loaderBar'),S=document.getElementById('loaderStatus'),P=document.getElementById('loaderPercent'),p=0;
+    function setP(pct,msg){p=Math.min(pct,100);if(B)B.style.width=p+'%';if(P)P.textContent=p+'%';if(S&&msg)S.textContent=msg;}
+    var steps={css:false,fonts:false,dom:false,api:false};
+    function check(){if(steps.css&&steps.fonts&&steps.dom&&steps.api){setP(100,'加载完成');setTimeout(function(){L.classList.add('hide')},400);}}
+    setP(5,'正在连接...');
+    document.querySelectorAll('link[rel="stylesheet"]').forEach(function(l){if(l.sheet){steps.css=true;setP(25,'样式加载完成');check();return;}l.addEventListener('load',function(){steps.css=true;setP(25,'样式加载完成');check();});});
+    if(document.readyState!=='loading'){steps.dom=true;setP(35,'页面结构就绪');check();}else document.addEventListener('DOMContentLoaded',function(){steps.dom=true;setP(35,'页面结构就绪');check();});
+    if(document.fonts)document.fonts.ready.then(function(){steps.fonts=true;setP(45,'字体就绪');check();});else{steps.fonts=true;setP(45,'');check();}
+    window.__loaderMarkApiReady=function(){steps.api=true;setP(80,'数据加载完成');check();};
+    setTimeout(function(){if(L&&!L.classList.contains('hide')){setP(100,'加载完成');setTimeout(function(){L.classList.add('hide')},400);}},10000);})();
+  </script>
+  <!-- ============================================================
+       侧边栏
+       ============================================================ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/icons/logo.svg" alt="Logo" class="sidebar-logo">
+      <h1 class="sidebar-title">智能看板</h1>
+      <button class="sidebar-toggle" id="sidebarToggle">
+        <img src="../assets/icons/collapse.svg" alt="折叠">
+      </button>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../index.html" class="nav-item" data-page="dashboard">
+        <img src="../assets/icons/dashboard.svg" class="nav-icon">
+        <span class="nav-text">总览看板</span>
+      </a>
+      <a href="detail.html" class="nav-item" data-page="detail">
+        <img src="../assets/icons/device.svg" class="nav-icon">
+        <span class="nav-text">设备管理</span>
+      </a>
+      <a href="alarms.html" class="nav-item" data-page="alarms">
+        <img src="../assets/icons/alarm.svg" class="nav-icon">
+        <span class="nav-text">告警管理</span>
+        <span class="nav-badge" id="alarmBadge" style="display:none;">0</span>
+      </a>
+      <a href="personnel.html" class="nav-item" data-page="personnel">
+        <img src="../assets/icons/user.svg" class="nav-icon">
+        <span class="nav-text">人员管理</span>
+      </a>
+      <a href="settings.html" class="nav-item active" data-page="settings">
+        <img src="../assets/icons/settings.svg" class="nav-icon">
+        <span class="nav-text">系统设置</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="theme-toggle" id="themeToggle">
+        <i class="fas fa-moon" id="themeIcon"></i>
+        <span class="theme-label">暗色主题</span>
+      </button>
+    </div>
+  </aside>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- ============================================================
+       主内容区
+       ============================================================ -->
+  <main class="main-content" id="mainContent">
+    <header class="topbar">
+      <div class="topbar__left">
+        <span class="topbar__hamburger" id="menuBtn"><i class="fas fa-bars"></i></span>
+        <span class="topbar__breadcrumb">首页 / <span>系统设置</span></span>
+      </div>
+      <div class="topbar__right">
+        <span class="topbar__clock" id="clock">--:--:--</span>
+      </div>
+    </header>
+
+    <div class="content-area" style="padding:0;">
+      <!-- 页面标题 -->
+      <div class="page-header">
+        <h1 class="page-title" style="font-size:22px;font-weight:700;color:var(--text-primary);">
+          <i class="fas fa-cog" style="color:var(--brand-purple,#6C3FF5);margin-right:8px;"></i>系统设置
+        </h1>
+      </div>
+
+      <div class="settings-grid">
+
+        <!-- ===== 1. 主题设置 ===== -->
+        <div class="settings-card">
+          <div class="settings-card__title"><i class="fas fa-palette"></i> 主题设置</div>
+          <div class="radio-group" id="themeGroup">
+            <label class="radio-label">
+              <input type="radio" name="theme" value="dark">
+              <span class="radio-custom"></span>
+              🌙 暗色
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="theme" value="light">
+              <span class="radio-custom"></span>
+              ☀️ 亮色
+            </label>
+          </div>
+        </div>
+
+        <!-- ===== 2. 数据刷新间隔 ===== -->
+        <div class="settings-card">
+          <div class="settings-card__title"><i class="fas fa-sync-alt"></i> 数据刷新间隔</div>
+          <div class="setting-row">
+            <span class="setting-label">自动刷新</span>
+            <select class="setting-select" id="refreshIntervalSelect">
+              <option value="5000">5 秒</option>
+              <option value="10000" selected>10 秒</option>
+              <option value="30000">30 秒</option>
+              <option value="60000">60 秒</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- ===== 3. 默认时间范围 ===== -->
+        <div class="settings-card">
+          <div class="settings-card__title"><i class="fas fa-calendar-alt"></i> 默认时间范围</div>
+          <div class="setting-row">
+            <span class="setting-label">图表默认范围</span>
+            <select class="setting-select" id="timeRangeSelect">
+              <option value="today">今日</option>
+              <option value="7d" selected>近 7 天</option>
+              <option value="30d">近 30 天</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- ===== 4. 默认设备视图 ===== -->
+        <div class="settings-card">
+          <div class="settings-card__title"><i class="fas fa-th-large"></i> 默认设备视图</div>
+          <div class="radio-group" id="viewModeGroup">
+            <label class="radio-label">
+              <input type="radio" name="viewMode" value="card">
+              <span class="radio-custom"></span>
+              📇 卡片视图
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="viewMode" value="list">
+              <span class="radio-custom"></span>
+              ☰ 列表视图
+            </label>
+          </div>
+        </div>
+
+        <!-- ===== 5. 告警通知设置 ===== -->
+        <div class="settings-card">
+          <div class="settings-card__title"><i class="fas fa-bell"></i> 告警通知</div>
+          <div class="toggle-row">
+            <span class="setting-label">启用弹窗通知</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="notifyPopup">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <span class="setting-label">启用声音提醒</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="notifySound">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- ===== 6. 用户管理 ===== -->
+        <div class="settings-card settings-card--full" id="userManagementCard">
+          <div class="settings-card__title" style="display:flex;align-items:center;justify-content:space-between;">
+            <span><i class="fas fa-users"></i> 用户管理</span>
+            <button id="addUserBtn" class="btn-save" style="padding:6px 14px;font-size:12px;display:none;">
+              <i class="fas fa-plus"></i> 添加用户
+            </button>
+          </div>
+          <table class="users-table" id="usersTable">
+            <thead>
+              <tr><th>用户名</th><th>姓名</th><th>角色</th><th id="userActionTh" style="display:none;">操作</th></tr>
+            </thead>
+            <tbody id="usersTableBody">
+              <tr><td colspan="4" class="loading-text"><i class="fas fa-spinner fa-spin"></i>加载中...</td></tr>
+            </tbody>
+          </table>
+          <div id="accountActions" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-light);display:none;">
+            <button id="deactivateAccountBtn" class="btn-reset" style="padding:8px 18px;font-size:13px;border-color:var(--color-danger);color:var(--color-danger);">
+              <i class="fas fa-sign-out-alt"></i> 注销当前账号
+            </button>
+          </div>
+        </div>
+
+        <!-- ===== 添加用户弹窗 ===== -->
+        <div class="modal-overlay" id="addUserModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;">
+          <div class="modal-box" style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;padding:24px;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+            <h3 style="margin-bottom:16px;font-size:18px;"><i class="fas fa-user-plus" style="color:#6C3FF5;"></i> 添加新用户</h3>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div>
+                <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:4px;">用户名</label>
+                <input id="newUsername" style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;outline:none;" placeholder="至少3个字符">
+              </div>
+              <div>
+                <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:4px;">姓名</label>
+                <input id="newName" style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;outline:none;" placeholder="显示姓名">
+              </div>
+              <div>
+                <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:4px;">密码</label>
+                <input id="newPassword" type="password" style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;outline:none;" placeholder="至少4位">
+              </div>
+              <div>
+                <label style="font-size:13px;color:var(--text-secondary);display:block;margin-bottom:4px;">角色</label>
+                <select id="newRole" style="width:100%;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:14px;outline:none;cursor:pointer;">
+                  <option value="operator">产线操作员</option>
+                  <option value="engineer">设备工程师</option>
+                  <option value="admin">车间主管</option>
+                </select>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:18px;">
+              <button id="confirmAddUser" class="btn-save" style="flex:1;">确认添加</button>
+              <button id="cancelAddUser" class="btn-reset" style="flex:1;">取消</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ===== 7. 操作按钮 ===== -->
+      <div class="settings-actions">
+        <button class="btn-save" id="saveBtn"><i class="fas fa-check"></i> 保存设置</button>
+        <button class="btn-reset" id="resetBtn"><i class="fas fa-undo"></i> 恢复默认</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===== Toast 提示 ===== -->
+  <div id="toastMessage">✅ 设置已保存</div>
+
+  <!-- ============================================================
+       JavaScript
+       ============================================================ -->
+  <script src="../js/utils.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    // ============================================================
+    // 1. 回显表单
+    // ============================================================
+    function loadSettings() {
+      // 主题
+      var theme = localStorage.getItem('dashboard_theme') || 'dark';
+      document.querySelectorAll('input[name="theme"]').forEach(function(r) {
+        r.checked = r.value === theme;
+      });
+
+      // 刷新间隔
+      var interval = localStorage.getItem('dashboard_refreshInterval') || '10000';
+      document.getElementById('refreshIntervalSelect').value = interval;
+
+      // 时间范围
+      var range = localStorage.getItem('dashboard_timeRange') || '7d';
+      document.getElementById('timeRangeSelect').value = range;
+
+      // 视图模式
+      var viewMode = localStorage.getItem('dashboard_viewMode') || 'card';
+      document.querySelectorAll('input[name="viewMode"]').forEach(function(r) {
+        r.checked = r.value === viewMode;
+      });
+
+      // 通知
+      var popup = localStorage.getItem('dashboard_notify_popup');
+      document.getElementById('notifyPopup').checked = popup !== 'false'; // 默认 true
+      var sound = localStorage.getItem('dashboard_notify_sound');
+      document.getElementById('notifySound').checked = sound === 'true'; // 默认 false
+    }
+
+    // ============================================================
+    // 2. 主题立即生效（radio 切换时调用 applyTheme）
+    // ============================================================
+    document.querySelectorAll('input[name="theme"]').forEach(function(r) {
+      r.addEventListener('change', function() {
+        if (this.checked) {
+          localStorage.setItem('dashboard_theme', this.value);
+          if (typeof applyTheme === 'function') applyTheme(this.value);
+        }
+      });
+    });
+
+    // ============================================================
+    // 3. 保存设置
+    // ============================================================
+    document.getElementById('saveBtn').addEventListener('click', function() {
+      // 主题
+      var theme = document.querySelector('input[name="theme"]:checked');
+      if (theme) localStorage.setItem('dashboard_theme', theme.value);
+
+      // 刷新间隔
+      var interval = document.getElementById('refreshIntervalSelect').value;
+      localStorage.setItem('dashboard_refreshInterval', interval);
+      // 重置自动刷新（如果 startAutoRefresh 存在）
+      if (typeof startAutoRefresh === 'function') {
+        startAutoRefresh(parseInt(interval));
+      }
+
+      // 时间范围
+      var range = document.getElementById('timeRangeSelect').value;
+      localStorage.setItem('dashboard_timeRange', range);
+
+      // 视图模式
+      var viewMode = document.querySelector('input[name="viewMode"]:checked');
+      if (viewMode) localStorage.setItem('dashboard_viewMode', viewMode.value);
+
+      // 通知
+      localStorage.setItem('dashboard_notify_popup', document.getElementById('notifyPopup').checked);
+      localStorage.setItem('dashboard_notify_sound', document.getElementById('notifySound').checked);
+
+      showToast('✅ 设置已保存');
+    });
+
+    // ============================================================
+    // 4. 恢复默认
+    // ============================================================
+    document.getElementById('resetBtn').addEventListener('click', function() {
+      localStorage.setItem('dashboard_theme', 'dark');
+      localStorage.setItem('dashboard_refreshInterval', '10000');
+      localStorage.setItem('dashboard_timeRange', '7d');
+      localStorage.setItem('dashboard_viewMode', 'card');
+      localStorage.setItem('dashboard_notify_popup', 'true');
+      localStorage.setItem('dashboard_notify_sound', 'false');
+      location.reload();
+    });
+
+    // ============================================================
+    // 5. Toast 消息
+    // ============================================================
+    var toastTimer = null;
+
+    function showToast(msg) {
+      var el = document.getElementById('toastMessage');
+      if (!el) return;
+      if (toastTimer) clearTimeout(toastTimer);
+      el.textContent = msg;
+      el.classList.add('show');
+      toastTimer = setTimeout(function() {
+        el.classList.remove('show');
+      }, 3000);
+    }
+
+    // ============================================================
+    // 6. 获取当前登录用户
+    // ============================================================
+    function getCurrentUser() {
+      try {
+        return JSON.parse(sessionStorage.getItem('userInfo'));
+      } catch(e) { return null; }
+    }
+
+    // ============================================================
+    // 7. 加载用户表格（含主管操作列）
+    // ============================================================
+    async function loadUsers() {
+      var tbody = document.getElementById('usersTableBody');
+      var currentUser = getCurrentUser();
+      var isAdmin = currentUser && currentUser.role === 'admin';
+
+      try {
+        var users = await getUsers();
+        if (!users || users.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" class="empty-text">暂无用户数据</td></tr>';
+          return;
+        }
+        tbody.innerHTML = users.map(function(u) {
+          var delBtn = '';
+          if (isAdmin && u.id !== currentUser.id) {
+            delBtn = '<button class="del-user-btn" data-id="' + u.id + '" data-name="' + u.name + '" style="padding:4px 10px;border:none;border-radius:4px;background:rgba(255,23,68,0.15);color:#ff1744;font-size:12px;cursor:pointer;">删除</button>';
+          } else if (isAdmin && u.id === currentUser.id) {
+            delBtn = '<span style="font-size:11px;color:var(--text-muted);">当前账号</span>';
+          }
+          return '<tr>' +
+            '<td>' + (u.username || '--') + '</td>' +
+            '<td>' + (u.name || '--') + '</td>' +
+            '<td><span class="role-badge ' + (u.role || '') + '">' + (u.roleText || u.role || '--') + '</span></td>' +
+            '<td>' + delBtn + '</td>' +
+            '</tr>';
+        }).join('');
+
+        // 绑定删除按钮事件
+        tbody.querySelectorAll('.del-user-btn').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            var id = parseInt(this.dataset.id);
+            var name = this.dataset.name;
+            if (confirm('确定要删除用户 "' + name + '" 吗？此操作不可恢复。')) {
+              deleteUser(id).then(function() {
+                showToast('✅ 用户 "' + name + '" 已删除');
+                loadUsers();
+              }).catch(function(e) {
+                alert('删除失败：' + e.message);
+              });
+            }
+          });
+        });
+      } catch (error) {
+        console.error('加载用户列表失败:', error);
+        tbody.innerHTML = '<tr><td colspan="4" class="empty-text">❌ 加载失败</td></tr>';
+      }
+    }
+
+    // ============================================================
+    // 8. 主管专用 - 添加用户
+    // ============================================================
+    function initAdminControls() {
+      var currentUser = getCurrentUser();
+      if (!currentUser || currentUser.role !== 'admin') return;
+
+      // 显示主管操作按钮
+      document.getElementById('addUserBtn').style.display = 'inline-flex';
+      document.getElementById('userActionTh').style.display = '';
+      document.getElementById('accountActions').style.display = 'block';
+
+      // 添加用户按钮 → 弹出弹窗
+      document.getElementById('addUserBtn').addEventListener('click', function() {
+        document.getElementById('addUserModal').style.display = 'flex';
+      });
+
+      // 取消
+      document.getElementById('cancelAddUser').addEventListener('click', function() {
+        document.getElementById('addUserModal').style.display = 'none';
+      });
+
+      // 点击遮罩关闭
+      document.getElementById('addUserModal').addEventListener('click', function(e) {
+        if (e.target === this) this.style.display = 'none';
+      });
+
+      // 确认添加
+      document.getElementById('confirmAddUser').addEventListener('click', function() {
+        var username = document.getElementById('newUsername').value.trim();
+        var name = document.getElementById('newName').value.trim();
+        var password = document.getElementById('newPassword').value;
+        var role = document.getElementById('newRole').value;
+
+        if (!username || !name || !password) {
+          alert('请填写完整信息');
+          return;
+        }
+        if (username.length < 3) { alert('用户名至少3个字符'); return; }
+        if (password.length < 4) { alert('密码至少4位'); return; }
+
+        this.disabled = true;
+        this.textContent = '添加中...';
+
+        registerUser({ username: username, password: password, name: name, role: role })
+          .then(function() {
+            showToast('✅ 用户 "' + name + '" 添加成功');
+            document.getElementById('addUserModal').style.display = 'none';
+            document.getElementById('newUsername').value = '';
+            document.getElementById('newName').value = '';
+            document.getElementById('newPassword').value = '';
+            loadUsers();
+          })
+          .catch(function(e) {
+            alert('添加失败：' + e.message);
+          })
+          .finally(function() {
+            document.getElementById('confirmAddUser').disabled = false;
+            document.getElementById('confirmAddUser').textContent = '确认添加';
+          });
+      });
+
+      // 注销当前账号
+      document.getElementById('deactivateAccountBtn').addEventListener('click', function() {
+        if (!confirm('确定要注销当前账号吗？注销后你将退出登录，该操作不可恢复。')) return;
+
+        var pwd = prompt('请输入你的密码以确认注销：');
+        if (!pwd) return;
+
+        // 先验证密码，再删除自己
+        changePassword({ id: currentUser.id, oldPassword: pwd, newPassword: 'DELETING' })
+          .then(function() {
+            // 如果验证通过，再删除
+            return deleteUser(currentUser.id);
+          })
+          .then(function() {
+            alert('账号已注销');
+            sessionStorage.clear();
+            window.location.href = '../login.html';
+          })
+          .catch(function(e) {
+            alert('注销失败：' + e.message);
+          });
+      });
+    }
+
+    // ============================================================
+    // 9. 初始化
+    // ============================================================
+    document.addEventListener('DOMContentLoaded', function() {
+      loadSettings();
+      loadUsers();
+      initAdminControls();
+
+      // 数据加载完成后标记
+      setTimeout(function() {
+        if (typeof window.__loaderMarkApiReady === 'function') window.__loaderMarkApiReady();
+      }, 500);
+
+      // 常规初始化（由 app.js 提供）
+      if (typeof initClock === 'function') initClock();
+      //if (typeof initSidebar === 'function') initSidebar();
+      if (typeof initThemeToggle === 'function') initThemeToggle();
+    });
+  </script>
+</body>
+</html>

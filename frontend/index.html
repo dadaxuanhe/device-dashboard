@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>总览看板 · 智能工厂</title>
+
+  <!-- Font Awesome 6 (图标) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <!-- ECharts CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+
+  <!-- External CSS -->
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <style>
+    /* 仪表盘专属样式（预留） */
+  </style>
+</head>
+<body>
+  <!-- ============================================================
+       加载进度条（页面完全加载后自动隐藏）
+       ============================================================ -->
+  <div id="pageLoader" style="position:fixed;inset:0;z-index:99999;background:#0a0e17;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.5s ease;">
+    <div style="width:280px;max-width:80%;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+        <div style="width:40px;height:40px;border:3px solid rgba(108,63,245,0.3);border-top-color:#6C3FF5;border-radius:50%;animation:loaderSpin 0.8s linear infinite;"></div>
+        <div>
+          <div style="font-size:18px;font-weight:600;color:#e8edf5;">智能看板</div>
+          <div style="font-size:13px;color:#6a7588;margin-top:2px;">正在加载资源...</div>
+        </div>
+      </div>
+      <div style="height:4px;background:#1e293b;border-radius:4px;overflow:hidden;">
+        <div id="loaderBar" style="height:100%;width:0%;background:linear-gradient(90deg,#6C3FF5,#8b5cf6);border-radius:4px;transition:width 0.4s ease;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#5a6478;margin-top:6px;">
+        <span id="loaderStatus">初始化...</span>
+        <span id="loaderPercent">0%</span>
+      </div>
+    </div>
+  </div>
+  <style>
+    @keyframes loaderSpin { to { transform:rotate(360deg); } }
+    #pageLoader.hide { opacity:0; pointer-events:none; }
+  </style>
+  <script>
+    // 加载进度管理
+    (function(){
+      var loader = document.getElementById('pageLoader');
+      var bar = document.getElementById('loaderBar');
+      var statusText = document.getElementById('loaderStatus');
+      var percentText = document.getElementById('loaderPercent');
+      var progress = 0;
+
+      function setProgress(pct, msg) {
+        progress = Math.min(pct, 100);
+        if (bar) bar.style.width = progress + '%';
+        if (percentText) percentText.textContent = progress + '%';
+        if (statusText && msg) statusText.textContent = msg;
+      }
+
+      // 步骤跟踪
+      setProgress(5, '正在连接...');
+
+      var steps = {
+        css: false,
+        fonts: false,
+        echarts: false,
+        domReady: false,
+        apiData: false,
+        charts: false
+      };
+
+      function checkComplete() {
+        var allDone = steps.css && steps.fonts && steps.echarts && steps.domReady && steps.apiData && steps.charts;
+        if (allDone && loader) {
+          setProgress(100, '加载完成');
+          setTimeout(function() { loader.classList.add('hide'); }, 400);
+        }
+      }
+
+      // CSS 加载完成
+      document.querySelectorAll('link[rel="stylesheet"]').forEach(function(link) {
+        if (link.sheet) { steps.css = true; setProgress(20, '样式加载完成'); checkComplete(); return; }
+        link.addEventListener('load', function() { steps.css = true; setProgress(20, '样式加载完成'); checkComplete(); });
+      });
+
+      // ECharts 加载完成
+      var echartsScript = document.querySelector('script[src*="echarts"]');
+      if (echartsScript) {
+        if (window.echarts) { steps.echarts = true; setProgress(30, '图表库加载完成'); checkComplete(); }
+        else echartsScript.addEventListener('load', function() { steps.echarts = true; setProgress(30, '图表库加载完成'); checkComplete(); });
+      } else { steps.echarts = true; setProgress(30, ''); checkComplete(); }
+
+      // DOM 就绪
+      if (document.readyState !== 'loading') { steps.domReady = true; setProgress(40, '页面结构就绪'); checkComplete(); }
+      else document.addEventListener('DOMContentLoaded', function() { steps.domReady = true; setProgress(40, '页面结构就绪'); checkComplete(); });
+
+      // 字体加载
+      if (document.fonts) {
+        document.fonts.ready.then(function() { steps.fonts = true; setProgress(50, '字体就绪'); checkComplete(); });
+      } else { steps.fonts = true; setProgress(50, ''); checkComplete(); }
+
+      // 暴露给 dashboard.js 等模块：API 数据加载完成时调用
+      window.__loaderMarkApiReady = function() {
+        steps.apiData = true;
+        setProgress(75, '数据加载完成');
+        checkComplete();
+      };
+      window.__loaderMarkChartsReady = function() {
+        steps.charts = true;
+        setProgress(90, '图表渲染完成');
+        checkComplete();
+      };
+
+      // 兜底：10 秒后强制隐藏
+      setTimeout(function() {
+        if (loader && !loader.classList.contains('hide')) {
+          setProgress(100, '加载完成');
+          setTimeout(function() { loader.classList.add('hide'); }, 400);
+        }
+      }, 10000);
+    })();
+  </script>
+  <!-- ============================================================
+       Wrapper
+       ============================================================ -->
+  <div class="wrapper">
+    <!-- ============================================================
+         Sidebar
+         ============================================================ -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <img src="assets/icons/logo.svg" alt="Logo" class="sidebar-logo">
+        <h1 class="sidebar-title">智能看板</h1>
+        <button class="sidebar-toggle" id="sidebarToggle">
+          <img src="assets/icons/collapse.svg" alt="折叠">
+        </button>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="index.html" class="nav-item active" data-page="dashboard">
+          <img src="assets/icons/dashboard.svg" class="nav-icon">
+          <span class="nav-text">总览看板</span>
+        </a>
+        <a href="pages/detail.html" class="nav-item" data-page="detail">
+          <img src="assets/icons/device.svg" class="nav-icon">
+          <span class="nav-text">设备管理</span>
+        </a>
+        <a href="pages/alarms.html" class="nav-item" data-page="alarms">
+          <img src="assets/icons/alarm.svg" class="nav-icon">
+          <span class="nav-text">告警管理</span>
+          <span class="nav-badge" id="alarmBadge" style="display:none;">0</span>
+        </a>
+        <a href="pages/personnel.html" class="nav-item" data-page="personnel">
+          <img src="assets/icons/user.svg" class="nav-icon">
+          <span class="nav-text">人员管理</span>
+        </a>
+        <a href="pages/settings.html" class="nav-item" data-page="settings">
+          <img src="assets/icons/settings.svg" class="nav-icon">
+          <span class="nav-text">系统设置</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="theme-toggle" id="themeToggle">
+          <i class="fas fa-moon" id="themeIcon"></i>
+          <span class="theme-label">暗色主题</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- 侧边栏遮罩 -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- ============================================================
+         Main
+         ============================================================ -->
+    <div class="main" id="mainContent">
+      <!-- Topbar -->
+      <header class="topbar">
+        <div class="topbar__left">
+          <span class="topbar__hamburger" id="menuBtn"><i class="fas fa-bars"></i></span>
+          <span class="topbar__breadcrumb">首页 / <span>总览看板</span></span>
+        </div>
+        <div class="topbar__right">
+          <div class="topbar__search">
+            <i class="fas fa-search"></i>
+            <input type="text" id="searchInput" placeholder="搜索设备..." />
+            <button class="search-clear" id="searchClear" aria-label="清除搜索">×</button>
+            <span class="kbd-hint">Ctrl+K</span>
+          </div>
+          <button class="topbar__icon-btn" id="refreshBtn" title="刷新数据">
+            <i class="fas fa-sync-alt"></i>
+          </button>
+          <button class="topbar__icon-btn" title="通知">
+            <i class="fas fa-bell"></i>
+            <span class="dot" id="notificationDot" style="display:none;"></span>
+          </button>
+          <span class="topbar__clock" id="clock">--:--:--</span>
+          <div class="topbar__avatar" title="用户">A</div>
+        </div>
+      </header>
+
+      <!-- 搜索结果提示条 -->
+      <div class="search-result-bar" id="searchResultBar">
+        <span id="searchResultText"></span>
+        <span class="clear-link" id="searchResultClear">清除筛选</span>
+      </div>
+
+      <!-- Content -->
+      <div class="content">
+        <!-- 页面标题 -->
+        <div class="page-header">
+          <h1 class="page-header__title">总览看板</h1>
+          <div class="page-header__actions">
+            <span class="refresh-time" id="lastRefreshTime" style="font-size:12px;color:var(--text-muted);align-self:center;">🔄 --:--:--</span>
+            <button class="btn btn--sm" id="refreshBtn2"><i class="fas fa-sync-alt"></i> 刷新</button>
+            <button class="btn btn--sm"><i class="fas fa-download"></i> 导出</button>
+          </div>
+        </div>
+
+        <!-- 告警滚动条 -->
+        <div class="alert-ticker" id="alertTicker" style="display:none;">
+          <span class="ticker-icon">🔔</span>
+          <div class="ticker-content" id="tickerContent"></div>
+        </div>
+
+        <!-- KPI 卡片 -->
+        <div class="kpi-grid" id="kpiGrid">
+          <div class="kpi-card" onclick="handleCardClick('status', 'all')" style="cursor:pointer;">
+            <div class="kpi-card__top">
+              <div class="kpi-card__icon purple"><i class="fas fa-industry"></i></div>
+              <span class="kpi-card__trend up">+5.2%</span>
+            </div>
+            <div class="kpi-card__value" id="kpi-total">--</div>
+            <div class="kpi-card__label">设备总数</div>
+          </div>
+          <div class="kpi-card" onclick="handleCardClick('status', 'online')" style="cursor:pointer;">
+            <div class="kpi-card__top">
+              <div class="kpi-card__icon green"><i class="fas fa-play-circle"></i></div>
+              <span class="kpi-card__trend up">+3.1%</span>
+            </div>
+            <div class="kpi-card__value" id="kpi-running">--</div>
+            <div class="kpi-card__label">运行中</div>
+          </div>
+          <div class="kpi-card" onclick="handleCardClick('status', 'warning')" style="cursor:pointer;">
+            <div class="kpi-card__top">
+              <div class="kpi-card__icon orange"><i class="fas fa-pause-circle"></i></div>
+              <span class="kpi-card__trend down">-1.2%</span>
+            </div>
+            <div class="kpi-card__value" id="kpi-idle">--</div>
+            <div class="kpi-card__label">待机</div>
+          </div>
+          <div class="kpi-card" onclick="handleCardClick('status', 'error')" style="cursor:pointer;">
+            <div class="kpi-card__top">
+              <div class="kpi-card__icon red"><i class="fas fa-exclamation-triangle"></i></div>
+              <span class="kpi-card__trend down">-2.0%</span>
+            </div>
+            <div class="kpi-card__value" id="kpi-fault">--</div>
+            <div class="kpi-card__label">故障</div>
+          </div>
+          <div class="kpi-card" onclick="handleCardClick('status', 'offline')" style="cursor:pointer;">
+            <div class="kpi-card__top">
+              <div class="kpi-card__icon purple"><i class="fas fa-circle"></i></div>
+              <span class="kpi-card__trend down">-0.5%</span>
+            </div>
+            <div class="kpi-card__value" id="kpi-offline">--</div>
+            <div class="kpi-card__label">离线</div>
+          </div>
+          <div class="kpi-card" onclick="handleCardClick('info', 'output')" style="cursor:pointer;">
+            <div class="kpi-card__top">
+              <div class="kpi-card__icon green"><i class="fas fa-box"></i></div>
+              <span class="kpi-card__trend up">+8.3%</span>
+            </div>
+            <div class="kpi-card__value" id="kpi-output">--</div>
+            <div class="kpi-card__label">今日产量</div>
+          </div>
+          <div class="kpi-card" onclick="handleCardClick('info', 'oee')" style="cursor:pointer;">
+            <div class="kpi-card__top">
+              <div class="kpi-card__icon purple"><i class="fas fa-tachometer-alt"></i></div>
+              <span class="kpi-card__trend up">+1.8%</span>
+            </div>
+            <div class="kpi-card__value" id="kpi-oee">--</div>
+            <div class="kpi-card__label">平均稼动率</div>
+          </div>
+          <div class="kpi-card alarm-highlight" onclick="location.href='pages/alarms.html'" style="cursor:pointer;">
+            <div class="kpi-card__top">
+              <div class="kpi-card__icon orange"><i class="fas fa-bell"></i></div>
+              <span class="kpi-card__trend up">+12</span>
+            </div>
+            <div class="kpi-card__value" id="kpi-alarms">--</div>
+            <div class="kpi-card__label">未处理告警</div>
+          </div>
+        </div>
+
+        <!-- 图表区域 -->
+        <div class="charts-row">
+          <div class="chart-card">
+            <div class="chart-card__header">
+              <span class="chart-card__title"><i class="fas fa-chart-line"></i> 产量趋势</span>
+              <div class="chart-card__actions">
+                <button class="range-btn" data-range="today">今日</button>
+                <button class="range-btn active" data-range="7d">7天</button>
+                <button class="range-btn" data-range="30d">30天</button>
+              </div>
+            </div>
+            <div id="productionChart" class="chart-container"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card__header">
+              <span class="chart-card__title"><i class="fas fa-chart-pie"></i> OEE</span>
+            </div>
+            <div id="oeeChart" class="chart-container"></div>
+          </div>
+          <!-- 温度曲线图 -->
+          <div class="chart-card chart-card--wide">
+            <div class="chart-card__header">
+              <span class="chart-card__title"><i class="fas fa-temperature-high"></i> 关键设备温度监控</span>
+              <span class="chart-card__actions" style="font-size:12px;color:var(--text-muted);">单位：℃</span>
+            </div>
+            <div id="temperatureChart" class="chart-container"></div>
+          </div>
+        </div>
+
+        <!-- 设备列表 -->
+        <div class="device-section">
+          <div class="device-section__header">
+            <span class="device-section__title"><i class="fas fa-server"></i> 设备状态</span>
+            <div class="device-section__filters">
+              <button class="filter-btn active" data-status="all">全部</button>
+              <button class="filter-btn" data-status="online">运行中</button>
+              <button class="filter-btn" data-status="warning">待机</button>
+              <button class="filter-btn" data-status="error">故障</button>
+              <button class="filter-btn" data-status="offline">离线</button>
+              <select id="typeFilter" style="padding:4px 8px;font-size:12px;border-radius:12px;background:transparent;border:1px solid var(--border-color);color:var(--text-secondary);outline:none;cursor:pointer;">
+                <option value="all">全部类型</option>
+                <option value="数控机床">数控机床</option>
+                <option value="注塑机">注塑机</option>
+                <option value="焊接机器人">焊接机器人</option>
+                <option value="冲压机">冲压机</option>
+                <option value="AGV">AGV</option>
+              </select>
+              <button class="view-toggle" id="viewToggle">☰ 列表</button>
+            </div>
+          </div>
+          <div class="device-grid" id="deviceGrid">
+            <!-- 由 JavaScript 动态渲染 -->
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 手机端底部Tab栏 -->
+  <nav class="bottom-tab-bar">
+    <a href="index.html" class="tab-item active"><span class="tab-icon">📊</span><span>总览</span></a>
+    <a href="pages/detail.html" class="tab-item"><span class="tab-icon">⚙️</span><span>设备</span></a>
+    <a href="pages/alarms.html" class="tab-item"><span class="tab-icon">🔔</span><span>告警</span><span class="tab-badge" id="mobileAlarmBadge" style="display:none;">0</span></a>
+    <a href="pages/personnel.html" class="tab-item"><span class="tab-icon">👤</span><span>人员</span></a>
+  </nav>
+
+  <!-- ============================================================
+       JavaScript
+       ============================================================ -->
+  <script src="js/utils.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- 齿轮背景 -->
+  <circle cx="16" cy="16" r="14" fill="#141b2d" stroke="#3b82f6" stroke-width="1.5"/>
+  <!-- 齿轮齿 -->
+  <path d="M16 4v4M16 24v4M4 16h4M24 16h4M7.5 7.5l2.8 2.8M21.7 21.7l2.8 2.8M7.5 24.5l2.8-2.8M21.7 10.3l2.8-2.8" stroke="#3b82f6" stroke-width="1.2" stroke-linecap="round"/>
+  <!-- 中心圆 -->
+  <circle cx="16" cy="16" r="5" fill="#3b82f6" opacity="0.3"/>
+  <circle cx="16" cy="16" r="3" fill="#3b82f6"/>
+  <!-- 闪电 -->
+  <path d="M16 10l-4 7h3v5l4-7h-3v-5z" fill="#fff"/>
+</svg>

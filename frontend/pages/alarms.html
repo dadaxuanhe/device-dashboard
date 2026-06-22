@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>告警管理 - 设备监控看板</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/layout.css">
+  <link rel="stylesheet" href="../css/components.css">
+  <link rel="stylesheet" href="../css/responsive.css">
+
+  <style>
+    /* ============================================================
+       告警页面专属样式
+       ============================================================ */
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+    .page-title {
+      font-size: 24px; font-weight: 600; color: var(--text-primary);
+    }
+    .page-title .badge {
+      font-size: 14px; font-weight: 400; color: var(--text-secondary); margin-left: 12px;
+    }
+    .alarm-summary {
+      display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;
+    }
+    .summary-item {
+      display: flex; align-items: center; gap: 8px; padding: 8px 16px;
+      background: var(--bg-card); border-radius: 8px; border-left: 4px solid var(--border-color);
+    }
+    .summary-item .count { font-size: 20px; font-weight: 700; }
+    .summary-item .label { font-size: 13px; color: var(--text-secondary); }
+    .summary-item.critical { border-left-color: #ff1744; }
+    .summary-item.critical .count { color: #ff1744; }
+    .summary-item.major { border-left-color: #ff9100; }
+    .summary-item.major .count { color: #ff9100; }
+    .summary-item.minor { border-left-color: #ffd740; }
+    .summary-item.minor .count { color: #ffd740; }
+    .summary-item.total { border-left-color: var(--color-primary); }
+    .summary-item.total .count { color: var(--color-primary); }
+
+    .alarm-filter-bar {
+      display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;
+    }
+    .alarm-filter-bar select, .alarm-filter-bar input {
+      padding: 8px 12px; background: var(--bg-card); border: 1px solid var(--border-color);
+      border-radius: 6px; color: var(--text-primary); font-size: 14px;
+    }
+    .alarm-filter-bar select:focus, .alarm-filter-bar input:focus {
+      border-color: var(--color-primary); outline: none;
+    }
+    .filter-label { font-size: 13px; color: var(--text-secondary); }
+
+    .alarm-table-wrap {
+      background: var(--bg-card); border: 1px solid var(--border-color);
+      border-radius: 12px; overflow: hidden;
+    }
+    .alarm-table { width: 100%; border-collapse: collapse; }
+    .alarm-table th {
+      padding: 14px 16px; text-align: left; font-size: 13px; font-weight: 600;
+      color: var(--text-secondary); border-bottom: 1px solid var(--border-color);
+      background: rgba(0,0,0,0.2);
+    }
+    .alarm-table td {
+      padding: 12px 16px; font-size: 14px; color: var(--text-primary);
+      border-bottom: 1px solid rgba(42,58,92,0.3); vertical-align: middle;
+    }
+    .alarm-table tr:hover td { background: rgba(59,130,246,0.05); }
+    .alarm-table tr:last-child td { border-bottom: none; }
+
+    .level-tag {
+      display: inline-block; padding: 2px 10px; border-radius: 12px;
+      font-size: 12px; font-weight: 500;
+    }
+    .level-tag.critical { background: rgba(255,23,68,0.2); color: #ff1744; }
+    .level-tag.major { background: rgba(255,145,0,0.2); color: #ff9100; }
+    .level-tag.minor { background: rgba(255,215,64,0.2); color: #ffd740; }
+
+    .status-tag {
+      display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px;
+    }
+    .status-tag.active { background: rgba(255,23,68,0.15); color: #ff1744; }
+    .status-tag.confirmed { background: rgba(255,215,64,0.15); color: #ffd740; }
+    .status-tag.cleared { background: rgba(0,230,118,0.15); color: #00e676; }
+
+    .action-btn {
+      padding: 4px 14px; border: none; border-radius: 4px; font-size: 12px;
+      cursor: pointer; transition: all 0.3s;
+    }
+    .action-btn.confirm { background: rgba(59,130,246,0.2); color: var(--color-primary); }
+    .action-btn.confirm:hover { background: var(--color-primary); color: #fff; }
+    .action-btn.clear { background: rgba(0,230,118,0.2); color: #00e676; }
+    .action-btn.clear:hover { background: #00e676; color: #fff; }
+    .action-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+
+    @media (max-width: 767px) {
+      .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+      .alarm-summary { gap: 8px; }
+      .summary-item { padding: 6px 12px; }
+      .summary-item .count { font-size: 16px; }
+      .alarm-table-wrap { overflow-x: auto; }
+      .alarm-table { font-size: 13px; min-width: 600px; }
+      .alarm-table th, .alarm-table td { padding: 8px 12px; }
+      .alarm-filter-bar { flex-direction: column; align-items: stretch; }
+    }
+
+    /* ===== 分页 ===== */
+    .page-btn:hover { border-color: var(--color-primary); color: var(--text-primary); }
+    .page-btn:disabled { opacity:0.4; cursor:default; }
+
+    /* ===== 紧急弹窗 ===== */
+    .modal-overlay {
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6);
+      z-index:9999; align-items:center; justify-content:center;
+    }
+    .modal-overlay.show { display:flex; }
+    .modal-box {
+      background:var(--bg-card); border:1px solid var(--border-color);
+      border-radius:12px; padding:24px; max-width:420px; width:90%;
+      box-shadow:0 20px 60px rgba(0,0,0,0.5);
+    }
+    .modal-box h3 { margin-bottom:12px; font-size:18px; }
+    .modal-box .modal-body { color:var(--text-secondary); font-size:14px; margin-bottom:18px; line-height:1.6; }
+    .modal-box .modal-btn {
+      padding:8px 24px; background:var(--color-danger); color:#fff;
+      border:none; border-radius:8px; font-size:14px; cursor:pointer;
+    }
+        /* ============================================================
+       【必须修复】强制侧边栏折叠样式（保证点击后视觉收缩）
+       ============================================================ */
+    /* 1. 折叠时，强制定位宽度为 64px */
+    .sidebar.collapsed {
+      width: 64px !important;
+      transition: width 0.25s ease !important;
+    }
+    
+    /* 2. 折叠时，强制隐藏侧边栏里的文字（解决文字挤出界面的问题） */
+    .sidebar.collapsed .sidebar-title,
+    .sidebar.collapsed .nav-text,
+    .sidebar.collapsed .nav-badge,
+    .sidebar.collapsed .theme-label {
+      opacity: 0 !important;
+      width: 0 !important;
+      overflow: hidden !important;
+      display: none !important;
+    }
+
+    /* 3. 折叠时，让导航图标在 64px 宽度中居中 */
+    .sidebar.collapsed .nav-icon {
+      margin: 0 auto !important;
+    }
+  </style>
+</head>
+<body>
+  <!-- ===== 加载进度条 ===== -->
+  <div id="pageLoader" style="position:fixed;inset:0;z-index:99999;background:#0a0e17;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.5s ease;">
+    <div style="width:280px;max-width:80%;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+        <div style="width:40px;height:40px;border:3px solid rgba(108,63,245,0.3);border-top-color:#6C3FF5;border-radius:50%;animation:loaderSpin 0.8s linear infinite;"></div>
+        <div><div style="font-size:18px;font-weight:600;color:#e8edf5;">智能看板</div><div style="font-size:13px;color:#6a7588;margin-top:2px;">正在加载...</div></div>
+      </div>
+      <div style="height:4px;background:#1e293b;border-radius:4px;overflow:hidden;">
+        <div id="loaderBar" style="height:100%;width:0%;background:linear-gradient(90deg,#6C3FF5,#8b5cf6);border-radius:4px;transition:width 0.4s ease;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#5a6478;margin-top:6px;">
+        <span id="loaderStatus">初始化...</span>
+        <span id="loaderPercent">0%</span>
+      </div>
+    </div>
+  </div>
+  <style>@keyframes loaderSpin{to{transform:rotate(360deg)}}#pageLoader.hide{opacity:0;pointer-events:none}</style>
+  <script>
+    (function(){var L=document.getElementById('pageLoader'),B=document.getElementById('loaderBar'),S=document.getElementById('loaderStatus'),P=document.getElementById('loaderPercent'),p=0;
+    function setP(pct,msg){p=Math.min(pct,100);if(B)B.style.width=p+'%';if(P)P.textContent=p+'%';if(S&&msg)S.textContent=msg;}
+    var steps={css:false,fonts:false,dom:false,api:false};
+    function check(){if(steps.css&&steps.fonts&&steps.dom&&steps.api){setP(100,'加载完成');setTimeout(function(){L.classList.add('hide')},400);}}
+    setP(5,'正在连接...');
+    document.querySelectorAll('link[rel="stylesheet"]').forEach(function(l){if(l.sheet){steps.css=true;setP(25,'样式加载完成');check();return;}l.addEventListener('load',function(){steps.css=true;setP(25,'样式加载完成');check();});});
+    if(document.readyState!=='loading'){steps.dom=true;setP(35,'页面结构就绪');check();}else document.addEventListener('DOMContentLoaded',function(){steps.dom=true;setP(35,'页面结构就绪');check();});
+    if(document.fonts)document.fonts.ready.then(function(){steps.fonts=true;setP(45,'字体就绪');check();});else{steps.fonts=true;setP(45,'');check();}
+    window.__loaderMarkApiReady=function(){steps.api=true;setP(80,'数据加载完成');check();};
+    setTimeout(function(){if(L&&!L.classList.contains('hide')){setP(100,'加载完成');setTimeout(function(){L.classList.add('hide')},400);}},10000);})();
+  </script>
+  <!-- ============================================================
+       侧边栏导航
+       ============================================================ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <img src="../assets/icons/logo.svg" alt="Logo" class="sidebar-logo">
+      <h1 class="sidebar-title">智能看板</h1>
+      <button class="sidebar-toggle" id="sidebarToggle">
+        <img src="../assets/icons/collapse.svg" alt="折叠">
+      </button>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="../index.html" class="nav-item" data-page="dashboard">
+        <img src="../assets/icons/dashboard.svg" class="nav-icon">
+        <span class="nav-text">总览看板</span>
+      </a>
+      <a href="detail.html" class="nav-item" data-page="detail">
+        <img src="../assets/icons/device.svg" class="nav-icon">
+        <span class="nav-text">设备管理</span>
+      </a>
+      <a href="alarms.html" class="nav-item active" data-page="alarms">
+        <img src="../assets/icons/alarm.svg" class="nav-icon">
+        <span class="nav-text">告警管理</span>
+        <span class="nav-badge" id="alarmBadge" style="display:none;">0</span>
+      </a>
+      <a href="personnel.html" class="nav-item" data-page="personnel">
+        <img src="../assets/icons/user.svg" class="nav-icon">
+        <span class="nav-text">人员管理</span>
+      </a>
+      <a href="settings.html" class="nav-item" data-page="settings">
+        <img src="../assets/icons/settings.svg" class="nav-icon">
+        <span class="nav-text">系统设置</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="theme-toggle" id="themeToggle">
+        <i class="fas fa-moon" id="themeIcon"></i>
+        <span class="theme-label">暗色主题</span>
+      </button>
+    </div>
+  </aside>
+
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- ============================================================
+       主内容区
+       ============================================================ -->
+  <main class="main-content" id="mainContent">
+    <header class="topbar">
+      <div class="topbar__left">
+        <span class="topbar__hamburger" id="menuBtn"><i class="fas fa-bars"></i></span>
+        <span class="topbar__breadcrumb">首页 / <span>告警管理</span></span>
+      </div>
+      <div class="topbar__right">
+        <span class="topbar__clock" id="clock">--:--:--</span>
+        <button class="topbar__icon-btn" id="refreshBtn" title="刷新数据"><i class="fas fa-sync-alt"></i></button>
+      </div>
+    </header>
+
+    <div class="content-area" style="padding:0;">
+      <!-- 页面标题 -->
+      <div class="page-header">
+        <h1 class="page-title">
+          🔔 告警管理
+          <span class="badge" id="totalBadge">共 0 条</span>
+        </h1>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn--primary" id="exportBtn">📥 导出CSV</button>
+          <button class="btn btn--primary" id="refreshAlarmsBtn">🔄 刷新</button>
+        </div>
+      </div>
+
+      <!-- 告警统计摘要 -->
+      <div class="alarm-summary" id="alarmSummary">
+        <!-- 由 JavaScript 动态渲染 -->
+      </div>
+
+      <!-- 筛选栏 -->
+      <div class="alarm-filter-bar">
+        <span class="filter-label">级别：</span>
+        <select id="levelFilter">
+          <option value="all">全部</option>
+          <option value="critical">紧急</option>
+          <option value="warning">重要</option>
+          <option value="info">一般</option>
+        </select>
+
+        <span class="filter-label">状态：</span>
+        <select id="statusFilter">
+          <option value="all">全部</option>
+          <option value="active">未处理</option>
+          <option value="confirmed">已确认</option>
+          <option value="cleared">已清除</option>
+        </select>
+
+        <span class="filter-label">设备：</span>
+        <select id="equipmentFilter">
+          <option value="all">全部设备</option>
+        </select>
+      </div>
+
+      <!-- 告警列表 -->
+      <div class="alarm-table-wrap">
+        <table class="alarm-table">
+          <thead>
+            <tr>
+              <th>级别</th>
+              <th>设备名称</th>
+              <th>告警内容</th>
+              <th>发生时间</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="alarmTableBody">
+            <tr><td colspan="6"><div class="empty-state"><p>加载中...</p></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <!-- ===== 新增：分页控件 ===== -->
+      <div class="pagination" id="pagination" style="display:flex;justify-content:center;align-items:center;gap:12px;padding:14px 0 4px;font-size:13px;color:var(--text-secondary);">
+        <button class="page-btn" id="prevPage" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:6px;background:transparent;color:var(--text-secondary);cursor:pointer;">← 上一页</button>
+        <span id="pageInfo">第 1 / 1 页</span>
+        <button class="page-btn" id="nextPage" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:6px;background:transparent;color:var(--text-secondary);cursor:pointer;">下一页 →</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============================================================
+       JavaScript（使用全局函数，非模块）
+       ============================================================ -->
+  <script src="../js/utils.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/app.js"></script>
+  <script>
+    // ============================================================
+    // 状态管理
+    // ============================================================
+    var currentLevel = 'all';
+    var currentStatus = 'all';
+    var currentEquipment = 'all';
+
+    // ============================================================
+    // 渲染告警统计摘要
+    // ============================================================
+    function renderSummary(summary) {
+      var container = document.getElementById('alarmSummary');
+      if (!summary || !summary.total) {
+        container.innerHTML = '<div class="summary-item total"><span class="count">0</span><span class="label">暂无告警</span></div>';
+        return;
+      }
+      container.innerHTML =
+        '<div class="summary-item critical"><span class="count">' + (summary.critical||0) +
+        '</span><span class="label">🔴 紧急</span></div>' +
+        '<div class="summary-item major"><span class="count">' + (summary.major||0) +
+        '</span><span class="label">🟠 重要</span></div>' +
+        '<div class="summary-item minor"><span class="count">' + (summary.minor||0) +
+        '</span><span class="label">🟡 一般</span></div>' +
+        '<div class="summary-item total"><span class="count">' + (summary.total||0) +
+        '</span><span class="label">📋 总计</span></div>';
+    }
+
+    // ============================================================
+    // 渲染告警列表
+    // ============================================================
+    function renderAlarms(alarms) {
+      var tbody = document.getElementById('alarmTableBody');
+      var badge = document.getElementById('totalBadge');
+      if (!badge) return;
+
+      badge.textContent = '共 ' + alarms.length + ' 条';
+
+      if (alarms.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">✅</div><p>暂无告警记录</p></div></td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = alarms.map(function(alarm) {
+        var levelClass = alarm.level;
+        var statusClass = alarm.status;
+        var isActive = alarm.status === 'active';
+        var isConfirmed = alarm.status === 'confirmed';
+
+        var actions = '';
+        if (isActive) {
+          actions = '<button class="action-btn confirm" data-id="' + alarm.id + '">确认</button>';
+        } else if (isConfirmed) {
+          actions = '<button class="action-btn clear" data-id="' + alarm.id + '">清除</button>';
+        } else {
+          actions = '<span style="color:var(--text-secondary);font-size:12px;">已处理</span>';
+        }
+
+        return '<tr>' +
+          '<td><span class="level-tag ' + levelClass + '">' + (alarm.levelText || alarm.level) + '</span></td>' +
+          '<td><strong>' + (alarm.equipmentName || '--') + '</strong></td>' +
+          '<td>' + (alarm.content || '--') + '</td>' +
+          '<td>' + (alarm.occurredAt ? formatDate(alarm.occurredAt) : '--') + '</td>' +
+          '<td><span class="status-tag ' + statusClass + '">' + getAlarmStatusText(alarm.status) + '</span></td>' +
+          '<td>' + actions + '</td>' +
+          '</tr>';
+      }).join('');
+
+      // 绑定操作事件
+      tbody.querySelectorAll('.action-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var id = parseInt(this.dataset.id);
+          var action = this.classList.contains('confirm') ? 'confirm' : 'clear';
+          handleAlarmAction(id, action);
+        });
+      });
+    }
+
+    // ============================================================
+    // 处理告警操作
+    // ============================================================
+    async function handleAlarmAction(id, action) {
+      var handler = prompt('请输入操作人姓名：', '管理员');
+      if (!handler) return;
+
+      try {
+        if (action === 'confirm') {
+          await confirmAlarm(id, handler);
+        } else {
+          await clearAlarm(id, handler);
+        }
+        loadAlarms();
+      } catch (error) {
+        alert('操作失败：' + error.message);
+      }
+    }
+
+    // ============================================================
+    // 加载设备列表（用于筛选下拉）
+    // ============================================================
+    async function loadEquipmentFilter() {
+      try {
+        var list = await getEquipment();
+        var select = document.getElementById('equipmentFilter');
+        select.innerHTML = '<option value="all">全部设备</option>';
+        (list || []).forEach(function(equip) {
+          select.innerHTML += '<option value="' + equip.id + '">' + equip.name + '</option>';
+        });
+      } catch (error) {
+        console.error('加载设备列表失败:', error);
+      }
+    }
+
+    // ============================================================
+    // 加载告警数据
+    // ============================================================
+    var previousAlarmCount = 0;
+    var currentPage = 1;
+    var totalPages = 1;
+
+    async function loadAlarms(page) {
+      // 【Bug 修复】：强制类型转换为安全整数
+      // 当 loadAlarms 被直接用作事件回调（refresh / setInterval）时,
+      // page 会接收到事件对象（如 PointerEvent），导致 currentPage 被赋值为对象,
+      // 最终传给后端的 page 参数变成 "[object PointerEvent]"，引发 SQLite 类型不匹配错误。
+      var parsedPage = parseInt(page);
+      if (!isNaN(parsedPage) && parsedPage >= 1) {
+        currentPage = parsedPage;
+      } else {
+        currentPage = 1; // 兜底：非法值（事件对象、NaN、<1）时回到第 1 页
+      }
+      try {
+        var params = { limit: 10, page: currentPage };
+        if (currentLevel !== 'all') params.level = currentLevel;
+        if (currentStatus !== 'all') params.status = currentStatus;
+        if (currentEquipment !== 'all') params.equipmentId = currentEquipment;
+
+        var result = await getAlarms(params);
+
+        // 【核心兼容补丁】：兼容后端返回 纯数组 和 分页对象 两种情况
+        var list = [];
+        var summary = { total: 0, critical: 0, major: 0, minor: 0 };
+
+        if (Array.isArray(result)) {
+          // 情况1：后端返回的是一个纯数组列表
+          list = result;
+          summary.total = list.length;
+        } else if (result && typeof result === 'object') {
+          // 情况2：后端返回的是 { list: [], summary: {} } 的分页对象
+          list = result.list || [];
+          summary = result.summary || summary;
+        }
+
+        renderSummary(summary);
+        renderAlarms(list);
+        window._alarmTableData = list; // 暴露给导出按钮使用
+
+        // 更新侧边栏告警徽章
+        var activeCount = (summary.critical || 0) + (summary.major || 0);
+        var badge = document.getElementById('alarmBadge');
+        if (badge) {
+          badge.textContent = activeCount;
+          badge.style.display = activeCount > 0 ? 'inline' : 'none';
+        }
+
+        // 标签页闪烁：检测新告警
+        if (typeof checkNewAlarms === 'function') {
+          checkNewAlarms(previousAlarmCount, (summary.total || 0));
+        }
+        previousAlarmCount = summary.total || 0;
+
+        // 分页信息
+        totalPages = Math.max(1, Math.ceil((summary.total || 0) / 10));
+        document.getElementById('pageInfo').textContent = '第 ' + (parseInt(currentPage) || 1) + ' / ' + (parseInt(totalPages) || 1) + ' 页';
+        document.getElementById('prevPage').disabled = currentPage <= 1;
+        document.getElementById('nextPage').disabled = currentPage >= totalPages;
+
+
+      } catch (error) {
+        console.error('加载告警失败:', error);
+        document.getElementById('alarmTableBody').innerHTML =
+          '<tr><td colspan="6"><div class="empty-state"><p>❌ 加载失败</p></div></td></tr>';
+      }
+      if (typeof window.__loaderMarkApiReady === 'function') window.__loaderMarkApiReady();
+    }
+
+    // ============================================================
+    // 初始化
+    // ============================================================
+    document.addEventListener('DOMContentLoaded', function() {
+      // 基础组件
+      initClock();
+      //initSidebar();
+
+      // 加载设备筛选
+      loadEquipmentFilter();
+
+      // 筛选事件
+      document.getElementById('levelFilter').addEventListener('change', function() {
+        currentLevel = this.value;
+        loadAlarms();
+      });
+      document.getElementById('statusFilter').addEventListener('change', function() {
+        currentStatus = this.value;
+        loadAlarms();
+      });
+      document.getElementById('equipmentFilter').addEventListener('change', function() {
+        currentEquipment = this.value;
+        loadAlarms();
+      });
+
+      // ===== 分页按钮 =====
+      document.getElementById('prevPage').addEventListener('click', function() {
+        if (currentPage > 1) loadAlarms(currentPage - 1);
+      });
+      document.getElementById('nextPage').addEventListener('click', function() {
+        if (currentPage < totalPages) loadAlarms(currentPage + 1);
+      });
+
+      // 刷新按钮
+      document.getElementById('refreshAlarmsBtn').addEventListener('click', loadAlarms);
+      document.getElementById('refreshBtn').addEventListener('click', loadAlarms);
+
+      // 加载告警数据
+      loadAlarms();
+
+      // 每60秒自动刷新
+      setInterval(loadAlarms, 60000);
+
+      // 导出CSV
+      document.getElementById('exportBtn').addEventListener('click', function() {
+        var list = window._alarmTableData || [];
+        if (list.length === 0) { alert('暂无数据可导出'); return; }
+        var cols = [
+          { key: 'level', label: '级别' },
+          { key: 'equipmentName', label: '设备名称' },
+          { key: 'content', label: '告警内容' },
+          { key: 'occurredAt', label: '发生时间' },
+          { key: 'status', label: '状态' }
+        ];
+        var exportData = list.map(function(item) {
+          return {
+            level: getLevelText ? getLevelText(item.level) : item.level,
+            equipmentName: item.equipmentName,
+            content: item.content,
+            occurredAt: item.occurredAt ? formatDate(item.occurredAt) : '',
+            status: getAlarmStatusText ? getAlarmStatusText(item.status) : item.status
+          };
+        });
+        if (typeof exportToCSV === 'function') exportToCSV(exportData, cols, '告警记录');
+      });
+    });
+
+  </script>
+
+  <!-- 手机端底部Tab栏 -->
+  <nav class="bottom-tab-bar">
+    <a href="../index.html" class="tab-item">
+      <span class="tab-icon">📊</span>
+      <span>总览</span>
+    </a>
+    <a href="detail.html" class="tab-item">
+      <span class="tab-icon">⚙️</span>
+      <span>设备</span>
+    </a>
+    <a href="alarms.html" class="tab-item active">
+      <span class="tab-icon">🔔</span>
+      <span>告警</span>
+      <span class="tab-badge" id="mobileAlarmBadge" style="display:none;">0</span>
+    </a>
+    <a href="personnel.html" class="tab-item">
+      <span class="tab-icon">👤</span>
+      <span>人员</span>
+    </a>
+  </nav>
+
+
+</body>
+</html>
