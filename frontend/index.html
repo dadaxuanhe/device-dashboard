@@ -17,6 +17,8 @@
   <link rel="stylesheet" href="css/responsive.css">
   <style>
     /* 仪表盘专属样式（预留） */
+    /* 通知按钮静音态 */
+    #notificationBtn.muted { opacity: 0.4; }
   </style>
 </head>
 <body>
@@ -190,15 +192,18 @@
             <button class="search-clear" id="searchClear" aria-label="清除搜索">×</button>
             <span class="kbd-hint">Ctrl+K</span>
           </div>
+          <button class="topbar__icon-btn" id="topThemeBtn" title="切换主题">
+            <i class="fas fa-moon"></i>
+          </button>
           <button class="topbar__icon-btn" id="refreshBtn" title="刷新数据">
             <i class="fas fa-sync-alt"></i>
           </button>
-          <button class="topbar__icon-btn" title="通知">
+          <button class="topbar__icon-btn" id="notificationBtn" title="切换告警横幅">
             <i class="fas fa-bell"></i>
-            <span class="dot" id="notificationDot" style="display:none;"></span>
+            <span class="dot" id="notificationDot"></span>
           </button>
           <span class="topbar__clock" id="clock">--:--:--</span>
-          <div class="topbar__avatar" title="用户">A</div>
+          <div class="topbar__avatar" id="userAvatar" title="用户">A</div>
         </div>
       </header>
 
@@ -352,6 +357,115 @@
 
     </div>
   </div>
+
+  <!-- ============================================================
+       告警弹窗通知
+       ============================================================ -->
+  <div class="alarm-modal-overlay" id="alarmModal">
+    <div class="alarm-modal-box">
+      <div class="alarm-modal-header">
+        <i class="fas fa-exclamation-triangle" style="color:#ff1744;"></i>
+        <span>紧急告警</span>
+      </div>
+      <div class="alarm-modal-body" id="alarmModalBody"></div>
+      <div class="alarm-modal-footer">
+        <button class="alarm-modal-btn" id="alarmModalBtn">我知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    /* 告警弹窗样式 */
+    .alarm-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      z-index: 99999;
+      align-items: center;
+      justify-content: center;
+      animation: alarmFadeIn 0.3s ease;
+    }
+    .alarm-modal-overlay.show {
+      display: flex;
+    }
+    .alarm-modal-box {
+      background: var(--bg-card);
+      border: 1px solid rgba(255,23,68,0.3);
+      border-radius: 14px;
+      padding: 0;
+      max-width: 440px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      overflow: hidden;
+      animation: alarmSlideIn 0.3s ease;
+    }
+    .alarm-modal-header {
+      background: rgba(255,23,68,0.1);
+      padding: 16px 20px;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid rgba(255,23,68,0.15);
+    }
+    .alarm-modal-body {
+      padding: 20px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .alarm-modal-body .alarm-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-light);
+      font-size: 14px;
+      color: var(--text-primary);
+      line-height: 1.5;
+    }
+    .alarm-modal-body .alarm-item:last-child {
+      border-bottom: none;
+    }
+    .alarm-modal-body .alarm-level {
+      flex-shrink: 0;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(255,23,68,0.2);
+      color: #ff1744;
+    }
+    .alarm-modal-footer {
+      padding: 12px 20px;
+      text-align: right;
+      border-top: 1px solid var(--border-light);
+    }
+    .alarm-modal-btn {
+      padding: 8px 28px;
+      background: var(--brand-purple, #6C3FF5);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .alarm-modal-btn:hover {
+      opacity: 0.85;
+    }
+    @keyframes alarmFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes alarmSlideIn {
+      from { transform: translateY(-20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  </style>
 
   <!-- 手机端底部Tab栏 -->
   <nav class="bottom-tab-bar">

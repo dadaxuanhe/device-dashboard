@@ -26,6 +26,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initKeyboardShortcuts();
   initFullscreenBtn();
   initThemeToggle();
+  initNotificationToggle();
+  initUserAvatar();
 
   // 侧边栏遮罩点击关闭
   var overlay = document.getElementById('sidebarOverlay');
@@ -41,9 +43,10 @@ document.addEventListener('DOMContentLoaded', () => {
     initRangeButtons();
   }
 
-  // 默认加载近7天图表
+  // 默认加载图表（使用保存的时间范围设置）
   if (typeof loadAllCharts === 'function') {
-    loadAllCharts('7d');
+    var savedRange = localStorage.getItem('dashboard_timeRange') || '7d';
+    loadAllCharts(savedRange);
   }
 });
 
@@ -259,6 +262,8 @@ function applyTheme(theme) {
     var icon = document.querySelector('.theme-icon');
     if (label) label.textContent = '亮色主题';
     if (icon) icon.textContent = '☀️';
+    var topIcon = document.querySelector('#topThemeBtn i');
+    if (topIcon) { topIcon.className = 'fas fa-sun'; topIcon.style.color = '#ffd740'; }
   } else {
     document.documentElement.removeAttribute('data-theme');
     localStorage.setItem('dashboard_theme', 'dark');
@@ -266,6 +271,8 @@ function applyTheme(theme) {
     var icon = document.querySelector('.theme-icon');
     if (label) label.textContent = '暗色主题';
     if (icon) icon.textContent = '🌙';
+    var topIcon = document.querySelector('#topThemeBtn i');
+    if (topIcon) { topIcon.className = 'fas fa-moon'; topIcon.style.color = ''; }
   }
   currentTheme = theme;
 }
@@ -286,11 +293,56 @@ function initTheme() {
 }
 
 /**
+ * 初始化通知横幅开关
+ * 点击通知铃铛切换告警横幅的显示/隐藏
+ */
+function initNotificationToggle() {
+  var btn = document.getElementById('notificationBtn');
+  var ticker = document.getElementById('alertTicker');
+  if (!btn || !ticker) return;
+
+  // 回显上次的状态
+  var hidden = localStorage.getItem('dashboard_notification_hidden') === 'true';
+  if (hidden) {
+    ticker.style.display = 'none';
+    btn.classList.add('muted');
+  }
+
+  btn.addEventListener('click', function() {
+    var isHidden = ticker.style.display === 'none' || ticker.style.display === '';
+    if (isHidden || getComputedStyle(ticker).display === 'none') {
+      ticker.style.display = 'flex';
+      btn.classList.remove('muted');
+      localStorage.setItem('dashboard_notification_hidden', 'false');
+    } else {
+      ticker.style.display = 'none';
+      btn.classList.add('muted');
+      localStorage.setItem('dashboard_notification_hidden', 'true');
+    }
+  });
+}
+
+/**
  * 初始化主题切换按钮
  */
 function initThemeToggle() {
-  var btn = document.getElementById('themeToggle');
-  if (btn) btn.addEventListener('click', toggleTheme);
+  var sidebarBtn = document.getElementById('themeToggle');
+  if (sidebarBtn) sidebarBtn.addEventListener('click', toggleTheme);
+  var topBtn = document.getElementById('topThemeBtn');
+  if (topBtn) topBtn.addEventListener('click', toggleTheme);
+}
+
+/**
+ * 用户头像按钮 → 跳转系统设置
+ */
+function initUserAvatar() {
+  var avatar = document.getElementById('userAvatar');
+  if (avatar) {
+    avatar.style.cursor = 'pointer';
+    avatar.addEventListener('click', function() {
+      location.href = 'pages/settings.html';
+    });
+  }
 }
 
 // ============================================================

@@ -47,9 +47,10 @@ async function initDashboard() {
   // 初始化图表时间范围按钮
   initRangeButtons();
 
-  // 默认加载近7天图表
+  // 默认加载图表（使用保存的时间范围设置）
   if (typeof loadAllCharts === 'function') {
-    loadAllCharts('7d');
+    var savedRange = localStorage.getItem('dashboard_timeRange') || '7d';
+    loadAllCharts(savedRange);
     // 图表渲染完成后标记
     if (typeof window.__loaderMarkChartsReady === 'function') {
       // 给图表渲染一点时间
@@ -82,8 +83,9 @@ async function initDashboard() {
     });
   }
 
-  // 启动自动刷新
-  startAutoRefresh(10000);
+  // 启动自动刷新（使用保存的间隔设置）
+  var savedInterval = parseInt(localStorage.getItem('dashboard_refreshInterval')) || 10000;
+  startAutoRefresh(savedInterval);
 }
 
 // ==========================================
@@ -342,11 +344,56 @@ function bindDashboardEvents() {
 }
 
 // ============================================================
-// 告警滚动条
+// 告警滚动条 + 通知功能
 // ============================================================
 
+/** 记录上一次检测到的告警 ID 集合，用于增量检测 */
+let prevAlarmIds = new Set();
+
 /**
- * 加载活跃告警并渲染滚动条
+ * 播放提示音（使用 Web Audio API，无需外部音频文件）
+ */
+function playAlertSound() {
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var oscillator = ctx.createOscillator();
+    var gain = ctx.createGain();
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.type = 'square';
+    oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+    oscillator.frequency.setValueAtTime(660, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.4);
+  } catch (e) {
+    console.warn('播放提示音失败:', e.message);
+  }
+}
+
+/**
+ * 弹出告警通知
+ * @param {Array} newAlarms - 新增的告警列表
+ */
+function showAlarmPopup(newAlarms) {
+  var modal = document.getElementById('alarmModal');
+  var body = document.getElementById('alarmModalBody');
+  if (!modal || !body) return;
+
+  body.innerHTML = newAlarms.map(function(a) {
+    var levelText = a.level === 'critical' ? '紧急' : (a.level === 'major' ? '重要' : '一般');
+    return '<div class="alarm-item">' +
+      '<span class="alarm-level">' + levelText + '</span>' +
+      '<div><strong>' + (a.equipmentName || '未知设备') + '</strong><br>' +
+      (a.content || '') + '</div></div>';
+  }).join('');
+
+  modal.classList.add('show');
+}
+
+/**
+ * 加载活跃告警并渲染滚动条，同时检测新告警触发通知
  */
 async function loadAlertTicker() {
   try {
@@ -357,10 +404,16 @@ async function loadAlertTicker() {
 
     if (!alarms || alarms.length === 0) {
       container.style.display = 'none';
+      prevAlarmIds = new Set();
       return;
     }
 
-    container.style.display = 'flex';
+    // 尊重用户手动隐藏告警横幅的设置
+    if (localStorage.getItem('dashboard_notification_hidden') === 'true') {
+      container.style.display = 'none';
+    } else {
+      container.style.display = 'flex';
+    }
     const displayAlarms = alarms.slice(0, 5);
     content.innerHTML = displayAlarms.map(function(alarm) {
       var levelClass = alarm.level === 'critical' ? 'critical' : (alarm.level === 'major' ? 'major' : '');
@@ -368,10 +421,45 @@ async function loadAlertTicker() {
         '⚠️ ' + alarm.equipmentName + ' ' + alarm.content +
         '（' + (alarm.levelText || alarm.level) + '）</span>';
     }).join('');
+
+    // ===== 增量检测：发现新告警时触发通知 =====
+    var currentIds = new Set(alarms.map(function(a) { return a.id; }));
+    var newAlarms = alarms.filter(function(a) {
+      return !prevAlarmIds.has(a.id);
+    });
+    prevAlarmIds = currentIds;
+
+    if (newAlarms.length === 0) return;
+
+    // 检测是否有紧急/重要级别的告警
+    var criticalAlarms = newAlarms.filter(function(a) {
+      return a.level === 'critical' || a.level === 'major';
+    });
+    if (criticalAlarms.length === 0) return;
+
+    // 声音提醒
+    if (localStorage.getItem('dashboard_notify_sound') === 'true') {
+      playAlertSound();
+    }
+
+    // 弹窗通知
+    if (localStorage.getItem('dashboard_notify_popup') !== 'false') {
+      showAlarmPopup(criticalAlarms);
+    }
   } catch (error) {
     console.error('加载告警滚动条失败:', error);
   }
 }
+
+// ===== 关闭告警弹窗 =====
+document.addEventListener('click', function(e) {
+  var modal = document.getElementById('alarmModal');
+  var btn = document.getElementById('alarmModalBtn');
+  if (!modal) return;
+  if (e.target === btn || e.target === modal) {
+    modal.classList.remove('show');
+  }
+});
 
 // ===== 新增：加载值班人员卡片 =====
 async function loadStaffCards() {
@@ -434,7 +522,15 @@ async function loadPerfChart() {
  */
 function initRangeButtons() {
   var buttons = document.querySelectorAll('.range-btn');
+  
+  // 自动选中已保存的时间范围（先清除所有 active，再激活匹配的按钮）
+  var savedRange = localStorage.getItem('dashboard_timeRange') || '7d';
   buttons.forEach(function(btn) {
+    btn.classList.remove('active');
+    if (btn.dataset.range === savedRange) {
+      btn.classList.add('active');
+    }
+    
     btn.addEventListener('click', function() {
       buttons.forEach(function(b) { b.classList.remove('active'); });
       this.classList.add('active');
@@ -549,7 +645,11 @@ async function refreshDashboard() {
 
 document.addEventListener('visibilitychange', function() {
   if (document.hidden) { stopAutoRefresh(); }
-  else { refreshDashboard(); startAutoRefresh(10000); }
+  else {
+    refreshDashboard();
+    var savedInterval = parseInt(localStorage.getItem('dashboard_refreshInterval')) || 10000;
+    startAutoRefresh(savedInterval);
+  }
 });
 
 // ============================================================

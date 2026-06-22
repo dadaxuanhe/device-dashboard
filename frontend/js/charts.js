@@ -20,28 +20,36 @@ let currentRange = '7d';
 // ============================================================
 // 1. 产量折线图
 // ============================================================
-function renderProductionChart(data) {
+function renderProductionChart(data, range) {
   var dom = document.getElementById('productionChart');
   if (!dom) { console.warn('productionChart 容器未找到'); return; }
 
   if (!productionChart) productionChart = echarts.init(dom, 'dark');
 
-  // 补全缺失日期，确保X轴连续
+  // 根据选择的 range 计算完整的日期窗口
+  var rangeConfig = { today: 0, '7d': 6, '30d': 29 };
+  var daysBack = rangeConfig[range] !== undefined ? rangeConfig[range] : 29;
+  var today = new Date();
+  today.setHours(0, 0, 0, 0);
+  var startDate = new Date(today);
+  startDate.setDate(startDate.getDate() - daysBack);
+  var endDate = new Date(today);
+
+  // 构建日期到数据的映射
+  var map = {};
   if (data && data.length > 0) {
-    var sorted = data.slice().sort(function(a,b){return a.date.localeCompare(b.date);});
-    var start = new Date(sorted[0].date);
-    var end = new Date(sorted[sorted.length-1].date);
-    var filled = [];
-    var map = {};
-    sorted.forEach(function(d){ map[d.date] = d; });
-    var cur = new Date(start);
-    while (cur <= end) {
-      var key = cur.toISOString().slice(0,10);
-      filled.push(map[key] || { date:key, planQuantity:0, actualQuantity:0, qualifiedQuantity:0 });
-      cur.setDate(cur.getDate() + 1);
-    }
-    data = filled;
+    data.forEach(function(d) { map[d.date] = d; });
   }
+
+  // 生成完整的日期序列
+  var filled = [];
+  var cur = new Date(startDate);
+  while (cur <= endDate) {
+    var key = cur.toISOString().slice(0, 10);
+    filled.push(map[key] || { date: key, planQuantity: 0, actualQuantity: 0, qualifiedQuantity: 0 });
+    cur.setDate(cur.getDate() + 1);
+  }
+  data = filled;
 
   var option = {
     tooltip: {
@@ -306,7 +314,7 @@ async function loadAllCharts(range) {
       window.getOEE ? window.getOEE() : Promise.reject('getOEE not available')
     ]);
 
-    renderProductionChart(results[0]);
+    renderProductionChart(results[0], range);
     renderTemperatureChart(results[1]);
     renderOeeChart(results[2]);
 
