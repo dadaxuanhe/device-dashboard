@@ -86,7 +86,7 @@ device-dashboard/
 │   └── assets/icons/                 # 10 个 SVG 图标
 │
 ├── 设计说明文档.html                  # 本文档（HTML 版）
-└── 设计说明文档.md                    # 本文档（Markdown版）
+└── README.md                         # 本文档（Markdown版）
 ```
 
 ## 三、设计思路
