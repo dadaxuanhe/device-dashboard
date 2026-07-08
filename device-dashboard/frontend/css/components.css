@@ -1,0 +1,977 @@
+/**
+ * components.css - 可复用组件样式
+ *
+ * 职责：
+ * 1. 卡片（设备卡片 / KPI 卡片 / 参数卡片 / 图表卡片）
+ * 2. 按钮（主按钮 / 次按钮 / 筛选按钮 / 时间按钮）
+ * 3. 状态指示灯
+ * 4. KPI 数字
+ * 5. 表格
+ * 6. 表单元素
+ * 7. 标签 / 徽章
+ */
+
+/* ============================================ */
+/* KPI 卡片
+ * 深色背景 #141b2d（通过 CSS 变量 var(--bg-card)），圆角 12px，内边距 20px
+ * 左侧 4px 色条表示不同状态（运行中/待机/故障/离线）
+ * 数字 32px 加粗等宽字体
+ * 告警卡片含呼吸光晕动画（仅告警 > 0 时触发）
+ * ============================================ */
+.kpi-card {
+  background: var(--bg-card);           /* 深色卡片背景 #141b2d */
+  border-radius: var(--radius-lg);       /* 12px 圆角 */
+  padding: var(--space-lg);              /* 20px 内边距 */
+  border: 1px solid var(--border-color);
+  transition: all var(--transition-normal);
+  position: relative;                    /* 为 ::before 伪元素定位 */
+  overflow: hidden;
+}
+
+/* 左侧 4px 色条（通过伪元素实现） */
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  opacity: 0.8;
+}
+
+/* 各类状态的色条颜色 */
+.status-running::before { background: var(--color-success); }   /* 运行中 → 绿色 #00e676 */
+.status-idle::before    { background: var(--color-warning); }    /* 待机 → 黄色 #ffd740 */
+.status-fault::before   { background: var(--color-danger); }     /* 故障 → 红色 #ff1744 */
+.status-offline::before { background: var(--color-info); }       /* 离线 → 灰色 #546e7a */
+
+/* 默认色条（无状态修饰的卡片：总数/产量/OEE 使用品牌蓝） */
+.kpi-card:not([class*='status-'])::before { background: var(--color-primary); }
+
+.kpi-card:hover {
+  background: var(--bg-card-hover);
+  transform: translateY(-2px);                  /* 悬停上浮效果 */
+  box-shadow: var(--shadow-md);
+}
+
+/* 图标（左上角圆形背景） */
+.kpi-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-md);
+}
+
+/* 数字：32px 加粗等宽字体 */
+.kpi-number {
+  font-size: 2rem;            /* 32px */
+  font-weight: 700;
+  color: var(--text-white);
+  font-family: var(--font-mono);               /* 等宽字体便于数字对齐 */
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+/* 标签 */
+.kpi-label {
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* 底部辅助文字（预留） */
+.kpi-footer {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ============================================ */
+/* 告警卡片呼吸光晕动画
+ * 仅当告警数 > 0 时通过 JS 添加 .has-alarms 类触发
+ * ============================================ */
+@keyframes alarm-breathing {
+  0%   { box-shadow: 0 0 0 0 rgba(255, 23, 68, 0); }
+  50%  { box-shadow: 0 0 20px 4px rgba(255, 23, 68, 0.25); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 23, 68, 0); }
+}
+
+.alarm-highlight {
+  position: relative;
+}
+
+.alarm-highlight.has-alarms {
+  animation: alarm-breathing 2s ease-in-out infinite;
+  border-color: rgba(255, 23, 68, 0.3);
+}
+
+/* ============================================ */
+/* 图表卡片（ECharts 容器） */
+/* ============================================ */
+.chart-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  padding: var(--space-lg);
+  transition: all var(--transition-normal);
+}
+
+.chart-card:hover {
+  box-shadow: var(--shadow-glow);             /* 悬停发光效果 */
+}
+
+.chart-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-md);
+}
+
+.chart-card-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.chart-container {                             /* ECharts 渲染容器 */
+  width: 100%;
+  height: 100%;
+  min-height: 300px;                            /* 最低高度保证可读 */
+}
+
+.chart-card--small .chart-container {
+  min-height: 250px;                           /* 小型卡片减少高度 */
+}
+
+/* ============================================ */
+/* 时间范围切换按钮（图表用） */
+/* ============================================ */
+.chart-time-range {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 3px;                                /* 内边距产生按钮组间距 */
+}
+
+.time-btn {                                    /* 单个时间按钮 */
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.time-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-card);
+}
+
+.time-btn.active {                             /* 选中态：品牌蓝背景白字 */
+  color: var(--text-white);
+  background: var(--color-primary);
+}
+
+/* ============================================ */
+/* 设备卡片
+ * 背景 #1a2335（var(--bg-card-hover)），圆角 12px，hover 上浮效果
+ * 顶部：设备名称 + 状态指示灯（12px 圆形）
+ * 中部：设备编号、类型、稼动率/产量指标
+ * 底部：状态文字（颜色与状态匹配）
+ * ============================================ */
+.device-card {
+  background: var(--bg-card-hover);      /* 卡片背景 #1a2335 */
+  border-radius: var(--radius-lg);        /* 12px 圆角 */
+  border: 1px solid var(--border-color);
+  padding: var(--space-lg);
+  transition: all var(--transition-normal);
+  cursor: pointer;                         /* 整张卡片可点击 */
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  position: relative;                      /* 为收藏星标等绝对定位元素定位 */
+}
+
+.device-card:hover {
+  transform: translateY(-4px);            /* 悬停上浮 */
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  border-color: var(--color-primary);      /* 边框变品牌蓝 */
+}
+
+/* 顶部：设备名称 + 状态指示灯 */
+.device-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.device-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;                 /* 过长的设备名显示省略号 */
+}
+
+/* 状态指示灯：12px 圆形 */
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot.status-online  { background: var(--color-success); box-shadow: 0 0 8px var(--color-success); }   /* 运行中 → 绿色发光 */
+.status-dot.status-warning { background: var(--color-warning); box-shadow: 0 0 8px var(--color-warning); }   /* 待机 → 黄色发光 */
+.status-dot.status-error   { background: var(--color-danger);  box-shadow: 0 0 8px var(--color-danger); }     /* 故障 → 红色发光 */
+.status-dot.status-offline { background: var(--color-info); }                                                /* 离线 → 灰色 */
+
+/* 中部信息区域 */
+.device-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.device-code {                               /* 设备编号 */
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.device-type {                               /* 设备类型 */
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* 指标行（稼动率、产量） */
+.device-metrics {
+  display: flex;
+  gap: var(--space-md);
+  margin-top: 4px;
+}
+
+.metric {                                    /* 单个指标项 */
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.metric strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* 底部：状态文字 */
+.device-footer {
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--border-color);
+}
+
+.status-text {                               /* 底部状态文字 */
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+.status-text.status-online  { color: #00a86b; }   /* 运行中 */
+.status-text.status-warning { color: #e6a800; }   /* 待机 */
+.status-text.status-error   { color: #dc2626; }   /* 故障 */
+.status-text.status-offline { color: #64748b; }   /* 离线 */
+
+/* ============================================ */
+/* 参数卡片（设备详情页性能指标展示用） */
+/* ============================================ */
+.param-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  padding: var(--space-lg);
+  text-align: center;
+  transition: all var(--transition-normal);
+}
+
+.param-card:hover {
+  background: var(--bg-card-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.param-label {                               /* 参数名称标签 */
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-sm);
+}
+
+.param-value {                               /* 参数数值，大号等宽字体 */
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-white);
+  font-family: var(--font-mono);
+}
+
+.param-unit {                                /* 参数单位 */
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* ============================================ */
+/* 状态指示灯（通用组件） */
+/* ============================================ */
+.status-light {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+/* 通过 ::before 伪元素显示 8px 彩色圆点 */
+.status-light::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-light--online::before { background: var(--color-success); box-shadow: 0 0 6px var(--color-success); }   /* 运行中绿点 */
+.status-light--warning::before { background: var(--color-warning); box-shadow: 0 0 6px var(--color-warning); }   /* 警告黄点 */
+.status-light--error::before { background: var(--color-danger); box-shadow: 0 0 6px var(--color-danger); }       /* 故障红点 */
+.status-light--offline::before { background: var(--color-info); }                                                /* 离线灰点 */
+
+/* 详情页大号状态灯（16px） */
+.detail-status-light {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.detail-status-light.online { background: var(--color-success); box-shadow: 0 0 12px var(--color-success); }     /* 运行中绿 */
+.detail-status-light.warning { background: var(--color-warning); box-shadow: 0 0 12px var(--color-warning); }     /* 警告黄 */
+.detail-status-light.error { background: var(--color-danger); box-shadow: 0 0 12px var(--color-danger); }         /* 故障红 */
+.detail-status-light.offline { background: var(--color-info); }                                                  /* 离线灰 */
+
+/* ============================================ */
+/* 按钮（通用组件） */
+/* ============================================ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;                                     /* 图标与文字间距 */
+  padding: 8px 16px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+  white-space: nowrap;                           /* 禁止按钮内文字换行 */
+}
+
+.btn--primary {                                  /* 主要按钮：品牌蓝背景白字 */
+  background: var(--color-primary);
+  color: var(--text-white);
+}
+
+.btn--primary:hover {
+  background: var(--color-primary-hover);
+}
+
+.btn--secondary {                                /* 次要按钮：透明背景带边框 */
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.btn--secondary:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--text-muted);
+}
+
+.btn--danger {                                   /* 危险按钮：红色系 */
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  border: 1px solid transparent;
+}
+
+.btn--danger:hover {
+  background: var(--color-danger);
+  color: var(--text-white);
+}
+
+.btn--success {                                  /* 成功按钮：绿色系 */
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  border: 1px solid transparent;
+}
+
+.btn--success:hover {
+  background: var(--color-success);
+  color: var(--text-white);
+}
+
+/* ============================================ */
+/* 告警闪烁动画（紧急告警时触发） */
+/* ============================================ */
+@keyframes alarm-flash {                       /* 闪烁：透明度交替变化 */
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+@keyframes alarm-pulse {                       /* 脉冲：光晕向外扩散 */
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,23,68,0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(255,23,68,0); }
+}
+.alarm-flash-critical {                        /* 紧急告警快闪（1.2s） */
+  animation: alarm-flash 1.2s ease-in-out infinite;
+}
+.alarm-flash-warning {                         /* 重要告警慢闪（2s） */
+  animation: alarm-flash 2s ease-in-out infinite;
+}
+.alarm-pulse {
+  animation: alarm-pulse 1.5s ease-in-out infinite;
+}
+.nav-badge.has-active {                        /* 侧边栏告警徽章闪烁 */
+  animation: alarm-flash 1s ease-in-out infinite;
+  background: #ff1744 !important;
+}
+#notificationBtn.has-active {                  /* 通知铃铛按钮闪烁 */
+  color: #ff1744 !important;
+  animation: alarm-flash 1.2s ease-in-out infinite;
+}
+
+.btn--sm {                                     /* 小型按钮 */
+  padding: 4px 10px;
+  font-size: 0.8rem;
+}
+
+/* ============================================ */
+/* 筛选按钮组 */
+/* ============================================ */
+.filter-group {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 3px;                                /* 内边距产生按钮间距 */
+}
+
+.filter-btn {                                  /* 单个筛选按钮 */
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.filter-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-card);
+}
+
+.filter-btn.active {                           /* 选中态：品牌蓝背景白字 */
+  color: var(--text-white);
+  background: var(--color-primary);
+}
+
+/* ============================================ */
+/* 视图切换（卡片/列表） */
+/* ============================================ */
+.view-toggle {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 3px;
+}
+
+.view-btn {                                    /* 单个视图切换按钮 */
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.view-btn:hover {
+  color: var(--text-primary);
+}
+
+.view-btn.active {                             /* 选中态 */
+  color: var(--text-white);
+  background: var(--color-primary);
+}
+
+/* ============================================ */
+/* 搜索与筛选栏
+ * 位于 KPI 卡片下方，包含搜索框 + 状态筛选按钮 + 视图切换
+ * ============================================ */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+/* 搜索框 */
+.search-box {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 200px;
+  max-width: 360px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 6px 12px;
+  transition: border-color var(--transition-fast);
+}
+
+.search-box:focus-within {
+  border-color: var(--color-primary);
+}
+
+.search-box .search-icon {
+  font-size: 1rem;
+  margin-right: 8px;
+  line-height: 1;
+}
+
+.search-box input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.search-box input::placeholder {
+  color: var(--text-muted);
+}
+
+/* 快捷键提示 */
+.shortcut-hint {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-family: inherit;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+/* 筛选按钮组（复用已有 .filter-group / .filter-btn） */
+.filter-bar .filter-group {
+  flex-shrink: 0;
+}
+
+/* 视图切换按钮（独立样式，复用已有 .view-toggle） */
+.filter-bar .view-toggle {
+  flex-shrink: 0;
+  cursor: pointer;
+  padding: 6px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  transition: all var(--transition-fast);
+}
+
+.filter-bar .view-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--color-primary);
+}
+
+/* ============================================ */
+/* 表格 */
+/* ============================================ */
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  font-size: 0.875rem;
+}
+
+.data-table thead {
+  background: var(--bg-secondary);
+}
+
+.data-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.data-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.data-table tbody tr {
+  transition: background var(--transition-fast);
+}
+
+.data-table tbody tr:hover {
+  background: var(--bg-card-hover);
+}
+
+.data-table .empty-row {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 40px 16px;
+}
+
+/* ============================================ */
+/* 标签 / 徽章 */
+/* ============================================ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.badge--critical {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.badge--warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.badge--info {
+  background: var(--color-info-bg);
+  color: var(--color-info);
+}
+
+.badge--success {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.badge--active {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.badge--confirmed {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.badge--cleared {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.badge--online {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.badge--offline {
+  background: var(--color-info-bg);
+  color: var(--color-info);
+}
+
+.badge--warning-status {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.badge--error-status {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+/* ============================================ */
+/* 筛选下拉框 */
+/* ============================================ */
+.alarm-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.filter-select {
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+
+.filter-select:hover,
+.filter-select:focus {
+  border-color: var(--color-primary);
+}
+
+.filter-select option {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+/* ============================================ */
+/* 详情页信息 */
+/* ============================================ */
+.detail-meta {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.meta-sep {
+  margin: 0 8px;
+  color: var(--text-muted);
+}
+
+/* ============================================================
+   图表区域样式（Iteration 2）
+   ============================================================ */
+
+.charts-section {
+  margin-top: 24px;
+}
+
+.chart-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.chart-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.range-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.range-btn {
+  padding: 6px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.range-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--text-primary);
+}
+
+.range-btn.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+}
+
+.chart-card--wide {
+  grid-column: 1 / -1;
+}
+
+.chart-card--small {
+  grid-column: span 1;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.chart-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.chart-unit {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.chart-container {
+  width: 100%;
+  height: 100%;
+  min-height: 260px;
+}
+
+/* 手机端适配 - 图表堆叠 */
+@media (max-width: 767px) {
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-card--small {
+    grid-column: 1;
+  }
+
+  .chart-container {
+    min-height: 200px;
+  }
+
+  .chart-toolbar {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .range-buttons {
+    justify-content: center;
+  }
+}
+
+/* 平板端适配 */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .charts-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .chart-card--wide {
+    grid-column: 1 / -1;
+  }
+
+  .chart-container {
+    min-height: 220px;
+  }
+}
+
+/* ============================================================
+   告警滚动条（加分项）
+   ============================================================ */
+.alert-ticker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(255, 23, 68, 0.08);
+  border: 1px solid rgba(255, 23, 68, 0.2);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.alert-ticker .ticker-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  animation: pulse-icon 1s ease-in-out infinite;
+}
+
+@keyframes pulse-icon {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+.ticker-content {
+  display: flex;
+  gap: 40px;
+  white-space: nowrap;
+  animation: ticker-scroll 20s linear infinite;
+  flex-shrink: 0;
+}
+
+.ticker-content .ticker-text {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.ticker-content .ticker-text.critical {
+  color: #ff1744;
+}
+
+.ticker-content .ticker-text.major {
+  color: #ff9100;
+}
+
+@keyframes ticker-scroll {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.alert-ticker:hover .ticker-content {
+  animation-play-state: paused;
+}
+
+@media (max-width: 767px) {
+  .alert-ticker { padding: 6px 12px; }
+  .ticker-content { gap: 24px; }
+  .ticker-content .ticker-text { font-size: 12px; }
+}
+
+/* ============================================================
+   主题切换按钮
+   ============================================================ */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 13px;
+}
+
+.theme-toggle:hover {
+  border-color: var(--color-primary);
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+}
+
+.theme-toggle .theme-icon {
+  font-size: 18px;
+}
+
+/* ============================================================
+   刷新时间戳
+   ============================================================ */
+.refresh-time {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-right: 8px;
+}

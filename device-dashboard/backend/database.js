@@ -1,0 +1,380 @@
+/**
+ * database.js - 数据库连接与建表模块
+ *
+ * 职责：
+ * - 连接 SQLite 数据库（WAL 模式）
+ * - 创建 19 张业务表（若不存在）
+ * - 导出 getDb() / waitForDb() / closeDb() 供其他模块使用
+ */
+
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
+
+const DB_PATH = path.join(__dirname, 'data.db');
+
+let db = null;
+let dbReady = null;
+
+/**
+ * 获取数据库实例（单例），若未初始化则自动初始化
+ * @returns {sqlite3.Database}
+ */
+function getDb() {
+  if (db) return db;
+
+  db = new sqlite3.Database(DB_PATH, (err) => {
+    if (err) {
+      console.error('❌ 数据库连接失败:', err.message);
+      process.exit(1);
+    }
+    console.log('✅ 数据库连接成功:', DB_PATH);
+  });
+
+  // 使用 db.serialize() 确保 PRAGMA 设置和建表顺序执行
+  dbReady = new Promise((resolve) => {
+    db.serialize(() => {
+      // 启用 WAL 模式提升并发读写性能
+      db.run('PRAGMA journal_mode=WAL;');
+      // 启用外键约束，确保关联数据的完整性
+      db.run('PRAGMA foreign_keys=ON;');
+      createTables();
+      resolve();
+    });
+  });
+
+  return db;
+}
+
+/**
+ * 等待数据库初始化完成（表结构已就绪）
+ * @returns {Promise<void>}
+ */
+function waitForDb() {
+  if (dbReady) return dbReady;
+  // 触发首次初始化
+  getDb();
+  return dbReady;
+}
+
+/**
+ * 建表：若表不存在则创建
+ */
+function createTables() {
+  const stmts = [
+    // 1. 设备信息表（含实时参数、阈值、OEE、产量）
+    `CREATE TABLE IF NOT EXISTS equipment (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      equipmentNo TEXT UNIQUE NOT NULL,       -- 设备编号
+      name TEXT NOT NULL,                     -- 设备名称
+      type TEXT NOT NULL,                     -- 设备类型
+      model TEXT DEFAULT '',                  -- 设备型号
+      manufacturer TEXT DEFAULT '',           -- 制造商
+      location TEXT,                          -- 安装位置
+      installDate TEXT,                       -- 安装日期
+      status TEXT DEFAULT 'offline',          -- 运行状态（online/offline/warning/error）
+      oee REAL DEFAULT 0,                    -- 稼动率
+      currentOutput INTEGER DEFAULT 0,       -- 当前产量
+      temperature REAL DEFAULT 0,            -- 实时温度
+      current REAL DEFAULT 0,                -- 实时电流
+      voltage REAL DEFAULT 0,                -- 实时电压
+      pressure REAL DEFAULT 0,               -- 实时压力
+      tempMin REAL DEFAULT 20,               -- 温度下限
+      tempMax REAL DEFAULT 50,               -- 温度上限
+      currentMin REAL DEFAULT 10,            -- 电流下限
+      currentMax REAL DEFAULT 25,            -- 电流上限
+      voltageMin REAL DEFAULT 340,           -- 电压下限
+      voltageMax REAL DEFAULT 420,           -- 电压上限
+      pressureMin REAL DEFAULT 0.4,          -- 压力下限
+      pressureMax REAL DEFAULT 0.8,          -- 压力上限
+      maintenance_cycle INTEGER DEFAULT 90,  -- 维护周期（天）
+      description TEXT,                       -- 设备描述/备注
+      created_at TEXT DEFAULT (datetime('now','localtime')),
+      updated_at TEXT DEFAULT (datetime('now','localtime'))
+    )`,
+
+    // 2. 运行记录表
+    `CREATE TABLE IF NOT EXISTS runtime (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      equipment_id INTEGER NOT NULL,          -- 关联设备ID
+      status TEXT NOT NULL,                   -- 运行状态
+      start_time TEXT,                        -- 开始时间
+      end_time TEXT,                          -- 结束时间
+      duration INTEGER DEFAULT 0,            -- 持续时长（秒）
+      record_time TEXT DEFAULT (datetime('now','localtime')),
+      FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+    )`,
+
+    // 3. 产量记录表
+    `CREATE TABLE IF NOT EXISTS production (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      equipment_id INTEGER NOT NULL,          -- 关联设备ID
+      output_count INTEGER DEFAULT 0,         -- 产出数量
+      reject_count INTEGER DEFAULT 0,         -- 次品数量
+      cycle_time REAL DEFAULT 0,             -- 平均节拍（秒）
+      record_date TEXT NOT NULL,              -- 记录日期
+      record_time TEXT DEFAULT (datetime('now','localtime')),
+      FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+    )`,
+
+    // 4. 告警记录表
+    `CREATE TABLE IF NOT EXISTS alarms (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      equipment_id INTEGER NOT NULL,          -- 关联设备ID
+      level TEXT NOT NULL DEFAULT 'info',     -- 告警级别（critical/warning/info）
+      title TEXT NOT NULL,                    -- 告警标题
+      message TEXT,                           -- 告警详情
+      status TEXT DEFAULT 'active',           -- 状态（active/confirmed/cleared）
+      confirmed_by INTEGER,                   -- 确认人（关联人员ID）
+      confirmed_at TEXT,                      -- 确认时间
+      cleared_at TEXT,                        -- 清除时间
+      created_at TEXT DEFAULT (datetime('now','localtime')),
+      FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE,
+      FOREIGN KEY (confirmed_by) REFERENCES personnel(id)
+    )`,
+
+    // 5. 温度采集记录表
+    `CREATE TABLE IF NOT EXISTS temperature (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      equipment_id INTEGER NOT NULL,          -- 关联设备ID
+      temp_value REAL NOT NULL,               -- 温度值（℃）
+      record_time TEXT DEFAULT (datetime('now','localtime')),
+      FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+    )`,
+
+    // 6. 人员信息表
+    `CREATE TABLE IF NOT EXISTS personnel (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,                     -- 姓名
+      employee_no TEXT UNIQUE NOT NULL,       -- 工号
+      role TEXT NOT NULL,                     -- 角色（operator/technician/manager）
+      phone TEXT,                             -- 联系电话
+      email TEXT,                             -- 邮箱
+      status TEXT DEFAULT 'active',           -- 状态（active/inactive）
+      created_at TEXT DEFAULT (datetime('now','localtime'))
+    )`,
+
+    // 7. 操作日志表
+    `CREATE TABLE IF NOT EXISTS operations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      equipment_id INTEGER NOT NULL,          -- 关联设备ID
+      operator_id INTEGER NOT NULL,           -- 操作人ID
+      action TEXT NOT NULL,                   -- 操作动作
+      detail TEXT,                            -- 操作详情
+      result TEXT,                            -- 操作结果
+      record_time TEXT DEFAULT (datetime('now','localtime')),
+      FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE,
+      FOREIGN KEY (operator_id) REFERENCES personnel(id)
+    )`,
+
+    // 8. 维修记录表（含扩展的维修过程字段）
+    `CREATE TABLE IF NOT EXISTS maintenance (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      equipment_id INTEGER NOT NULL,          -- 关联设备ID
+      technician_id INTEGER NOT NULL,         -- 维修人员ID
+      type TEXT NOT NULL,                     -- 维修类型（repair/inspection/upgrade）
+      description TEXT,                       -- 维修描述/故障描述
+      fault_cause TEXT DEFAULT '',            -- 故障原因
+      parts_replaced TEXT DEFAULT '',         -- 更换零件
+      cost REAL DEFAULT 0,                   -- 维修费用
+      notes TEXT DEFAULT '',                  -- 备注
+      alarm_id INTEGER,                      -- 关联告警ID
+      start_time TEXT,                        -- 开始时间
+      end_time TEXT,                          -- 结束时间
+      status TEXT DEFAULT 'pending',          -- 状态（pending/in_progress/completed）
+      created_at TEXT DEFAULT (datetime('now','localtime')),
+      FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE,
+      FOREIGN KEY (technician_id) REFERENCES personnel(id),
+      FOREIGN KEY (alarm_id) REFERENCES alarms(id) ON DELETE SET NULL
+    )`,
+
+    // 9. 用户表（登录认证，多角色支持）
+    `CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,           -- 用户名（登录用）
+      password TEXT NOT NULL,                  -- 密码
+      name TEXT NOT NULL,                      -- 真实姓名
+      roles TEXT NOT NULL DEFAULT '',          -- 多角色，逗号分隔（dashboard_admin,workshop_supervisor,maintenance_tech,viewer）
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP
+    )`,
+
+    // 10. 值班人员表
+    `CREATE TABLE IF NOT EXISTS staff (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      position TEXT NOT NULL,
+      shift TEXT,
+      phone TEXT
+    )`,
+
+    // 11. 操作记录表
+    `CREATE TABLE IF NOT EXISTS op_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      time TEXT NOT NULL,
+      person TEXT NOT NULL,
+      action TEXT NOT NULL,
+      device TEXT,
+      result TEXT
+    )`,
+
+    // 12. 绩效表
+    `CREATE TABLE IF NOT EXISTS performance (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      month TEXT NOT NULL,
+      output INTEGER NOT NULL
+    )`,
+
+    // 13. 数据源配置表（看板管理员管理第三方API接口）
+    `CREATE TABLE IF NOT EXISTS data_sources (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,                     -- 数据源名称
+      type TEXT NOT NULL DEFAULT 'api',       -- 类型（api）
+      endpoint TEXT NOT NULL,                 -- API接口地址
+      api_key TEXT DEFAULT '',                -- API密钥
+      headers TEXT DEFAULT '{}',              -- 自定义请求头（JSON）
+      refresh_interval INTEGER DEFAULT 60,    -- 刷新间隔（秒）
+      description TEXT DEFAULT '',            -- 描述
+      status TEXT DEFAULT 'active',           -- 状态（active/inactive）
+      last_test_at TEXT,                      -- 最后测试时间
+      last_test_result TEXT,                  -- 最后测试结果
+      created_at TEXT DEFAULT (datetime('now','localtime')),
+      updated_at TEXT DEFAULT (datetime('now','localtime'))
+    )`,
+
+    // 14. 设备告警规则表（配置设备参数报警阈值）
+    `CREATE TABLE IF NOT EXISTS alarm_rules (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      equipment_id INTEGER NOT NULL,          -- 关联设备ID
+      param_name TEXT NOT NULL,               -- 参数名（temperature/current/voltage/pressure）
+      param_label TEXT NOT NULL DEFAULT '',   -- 参数显示名
+      min_value REAL,                         -- 下限值（null表示不检测下限）
+      max_value REAL,                         -- 上限值（null表示不检测上限）
+      enabled INTEGER DEFAULT 1,              -- 是否启用（1启用/0禁用）
+      notify_level TEXT DEFAULT 'warning',    -- 告警级别（critical/warning/info）
+      created_at TEXT DEFAULT (datetime('now','localtime')),
+      updated_at TEXT DEFAULT (datetime('now','localtime')),
+      FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+    )`,
+
+    // 15. 看板模板表
+    `CREATE TABLE IF NOT EXISTS board_templates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,                     -- 模板名称
+      description TEXT DEFAULT '',            -- 模板描述
+      layout_type TEXT NOT NULL DEFAULT 'single', -- 布局类型（single/double/triple/mixed）
+      thumbnail TEXT DEFAULT '',              -- 缩略图URL
+      config TEXT DEFAULT '{}',               -- 全局配置（JSON）
+      status TEXT DEFAULT 'draft',            -- 状态（draft/published）
+      created_at TEXT DEFAULT (datetime('now','localtime')),
+      updated_at TEXT DEFAULT (datetime('now','localtime'))
+    )`,
+
+    // 16. 组件库表（预定义看板组件）
+    `CREATE TABLE IF NOT EXISTS component_library (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,                     -- 组件名称
+      type TEXT NOT NULL,                     -- 组件类型（data_card/real_table/trend_chart/alarm_list/progress_bar）
+      icon TEXT DEFAULT '',                   -- 图标
+      default_config TEXT DEFAULT '{}',       -- 默认配置（JSON）
+      description TEXT DEFAULT '',            -- 组件描述
+      created_at TEXT DEFAULT (datetime('now','localtime'))
+    )`,
+
+    // 17. 模板-组件关联表
+    `CREATE TABLE IF NOT EXISTS template_components (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      template_id INTEGER NOT NULL,           -- 关联模板ID
+      component_id INTEGER NOT NULL,          -- 关联组件库ID
+      position TEXT NOT NULL DEFAULT '{}',    -- 位置信息（JSON: {row,col,width,height}）
+      config TEXT DEFAULT '{}',               -- 组件配置覆盖（JSON）
+      refresh_interval INTEGER DEFAULT 0,     -- 刷新间隔（秒，0=不刷新）
+      sort_order INTEGER DEFAULT 0,           -- 排序
+      created_at TEXT DEFAULT (datetime('now','localtime')),
+      FOREIGN KEY (template_id) REFERENCES board_templates(id) ON DELETE CASCADE,
+      FOREIGN KEY (component_id) REFERENCES component_library(id) ON DELETE CASCADE
+    )`,
+
+    // 18. 看板实例表（基于模板创建的具体看板）
+    `CREATE TABLE IF NOT EXISTS board_instances (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      template_id INTEGER NOT NULL,           -- 关联模板ID
+      name TEXT NOT NULL,                     -- 实例名称
+      description TEXT DEFAULT '',            -- 描述
+      display_config TEXT DEFAULT '{}',       -- 展示配置（JSON）
+      status TEXT DEFAULT 'draft',            -- 状态（draft/published/offline）
+      refresh_interval INTEGER DEFAULT 30,    -- 刷新间隔（秒）
+      created_at TEXT DEFAULT (datetime('now','localtime')),
+      updated_at TEXT DEFAULT (datetime('now','localtime')),
+      FOREIGN KEY (template_id) REFERENCES board_templates(id) ON DELETE CASCADE
+    )`,
+
+    // 19. 展示终端表
+    `CREATE TABLE IF NOT EXISTS display_terminals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,                     -- 终端名称
+      type TEXT NOT NULL DEFAULT 'pc',        -- 终端类型（pc/large_screen/mobile）
+      location TEXT DEFAULT '',               -- 安装位置
+      resolution TEXT DEFAULT '',             -- 分辨率
+      status TEXT DEFAULT 'offline',          -- 状态（online/offline）
+      bound_instance_id INTEGER,             -- 绑定的看板实例ID
+      last_heartbeat TEXT,                    -- 最后心跳时间
+      created_at TEXT DEFAULT (datetime('now','localtime')),
+      FOREIGN KEY (bound_instance_id) REFERENCES board_instances(id) ON DELETE SET NULL
+    )`,
+    
+    // 20. 用户设备收藏表（普通员工关注设备）
+    `CREATE TABLE IF NOT EXISTS user_favorites (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,               -- 用户ID
+      equipment_id INTEGER NOT NULL,          -- 设备ID
+      created_at TEXT DEFAULT (datetime('now','localtime')),
+      UNIQUE(user_id, equipment_id),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+    )`,
+
+    // 21. 用户看板分配表（管理员将看板分配给员工）
+    `CREATE TABLE IF NOT EXISTS user_board_assignments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      instance_id INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now','localtime')),
+      UNIQUE(user_id, instance_id),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (instance_id) REFERENCES board_instances(id) ON DELETE CASCADE
+    )`
+  ];
+
+  for (const stmt of stmts) {
+    db.run(stmt, (err) => {
+      if (err) console.error('❌ 建表失败:', err.message);
+    });
+  }
+
+  // 迁移：为 user_board_assignments 补充字段（兼容已有数据库）
+  db.run("ALTER TABLE user_board_assignments ADD COLUMN device_type TEXT DEFAULT ''", (err) => { /* 可能已存在 */ });
+  db.run("ALTER TABLE user_board_assignments ADD COLUMN last_active TEXT DEFAULT NULL", (err) => { /* 可能已存在 */ });
+  db.run("ALTER TABLE user_board_assignments ADD COLUMN is_online INTEGER DEFAULT 0", (err) => { /* 可能已存在 */ });
+
+  console.log('✅ 数据库表结构已就绪');
+}
+
+/**
+ * 关闭数据库连接
+ */
+function closeDb() {
+  if (db) {
+    // 移除错误监听器防止未处理异常
+    db.removeAllListeners('error');
+    db.close((err) => {
+      if (err) {
+        console.error('❌ 关闭数据库失败:', err.message);
+      } else {
+        console.log('✅ 数据库连接已关闭');
+        db = null;
+      }
+    });
+  }
+}
+
+module.exports = { getDb, waitForDb, closeDb };
