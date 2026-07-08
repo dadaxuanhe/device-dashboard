@@ -1,30 +1,113 @@
 /**
  * app.js - 应用入口模块
  *
- * 职责：
- * 1. 页面加载完成后初始化全局功能
- * 2. 侧边栏折叠/展开控制
- * 3. 导航高亮（根据当前页面）
- * 4. 全局时钟显示
- * 5. 响应式侧边栏（移动端点击遮罩关闭）
+ * 职责：页面全局初始化（主题/侧边栏/导航/时钟/快捷键/全屏/通知等），
+ * 角色权限守卫，标签页闪烁提醒。
  */
+
+// ==========================================
+// 角色权限守卫
+// ==========================================
+
+/**
+ * 检查当前页面是否允许当前角色访问
+ * @returns {boolean} 是否有权限
+ */
+function checkPageAccess() {
+  var user = getCurrentUser();
+  if (!user) return true;
+
+  var currentPath = window.location.pathname;
+  var currentPage = currentPath.split('/').pop();
+
+  // 普通员工只能访问看板和详情页
+  if (isOnlyViewer()) {
+    var allowedPages = ['index.html', 'detail.html', 'display.html', ''];
+    var isAllowed = allowedPages.some(function(p) {
+      return currentPage === p || currentPath.endsWith('/' + p) || currentPath.endsWith('/');
+    });
+    if (!isAllowed && !currentPath.includes('login.html')) {
+      console.warn('⛔ 普通员工权限不足，跳转到首页');
+      window.location.href = 'index.html';
+      return false;
+    }
+  }
+
+  // ------------------------------------------------------------
+  // 看板模板 & 发布管理 → 仅看板管理员（dashboard_admin）可访问
+  // ------------------------------------------------------------
+  // 功能：拦截非看板管理员用户通过 URL 直接访问 templates.html 或 publish.html
+  // 角色要求：dashboard_admin（看板管理员）
+  // 拦截后自动重定向到首页 index.html
+  // ------------------------------------------------------------
+  var restrictedPages = ['templates.html', 'publish.html'];
+  if (restrictedPages.indexOf(currentPage) !== -1 && !hasRole('dashboard_admin')) {
+    console.warn('⛔ 权限不足，仅看板管理员可访问此页面，跳转到首页');
+    window.location.href = 'index.html';
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * 根据角色过滤侧边栏导航项
+ */
+function filterSidebarByRole() {
+  var navItems = document.querySelectorAll('.nav-item');
+  navItems.forEach(function(item) {
+    var page = item.dataset.page;
+    // 普通员工只显示 dashboard 和 detail
+    if (isOnlyViewer()) {
+      if (page !== 'dashboard' && page !== 'detail') {
+        item.style.display = 'none';
+      }
+    }
+    // 设备维修员、普通员工隐藏设置
+    if (page === 'settings' && !hasRole('dashboard_admin') && !hasRole('workshop_supervisor')) {
+      item.style.display = 'none';
+    }
+    // 非车间主管且非看板管理员隐藏人员管理
+    if (page === 'personnel' && !hasRole('workshop_supervisor') && !hasRole('dashboard_admin')) {
+      item.style.display = 'none';
+    }
+    // ------------------------------------------------------------
+    // 看板模板 & 发布管理 → 仅看板管理员（dashboard_admin）可见
+    // ------------------------------------------------------------
+    // 目的：侧边栏中「看板模板」和「发布管理」两个导航项
+    //       只有拥有 dashboard_admin 角色的用户才显示
+    //       其余角色（车间主管/设备维修员/普通员工）均隐藏
+    // ------------------------------------------------------------
+    if ((page === 'templates' || page === 'publish') && !hasRole('dashboard_admin')) {
+      item.style.display = 'none';
+    }
+  });
+}
 
 // ==========================================
 // 全局初始化
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
-  // 登录检查：未登录跳转到登录页
+  // 登录检查
   if (sessionStorage.getItem('isLoggedIn') !== 'true' && !window.location.pathname.includes('login.html')) {
     window.location.href = 'login.html';
     return;
   }
 
+  // 角色权限守卫
+  if (!checkPageAccess()) return;
+
+  // 普通员工标记（方便CSS控制显示/隐藏）
+  if (isOnlyViewer()) {
+    document.body.classList.add('is-viewer');
+  }
+
   initTheme();
   initSidebar();
   initNavigation();
+  filterSidebarByRole();
   initClock();
   initKeyboardShortcuts();
-  initFullscreenBtn();
   initThemeToggle();
   initNotificationToggle();
   initUserAvatar();
@@ -38,12 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 初始化时间范围切换按钮（图表联动）
-  if (typeof initRangeButtons === 'function') {
-    initRangeButtons();
-  }
 
-  // 默认加载图表（使用保存的时间范围设置）
   if (typeof loadAllCharts === 'function') {
     var savedRange = localStorage.getItem('dashboard_timeRange') || '7d';
     loadAllCharts(savedRange);
@@ -63,12 +141,10 @@ function initSidebar() {
   const menuBtn = document.getElementById('menuBtn');
   const overlay = document.getElementById('sidebarOverlay');
 
-  // 防御：若 #sidebar 不存在则日志反馈
   if (!sidebar) {
     console.error('[initSidebar] 未找到 #sidebar 元素 —— 侧边栏功能将不可用');
   }
 
-  // 移动端：打开/关闭侧边栏
   function openSidebar() {
     if (sidebar) {
       sidebar.classList.remove('collapsed');
@@ -83,24 +159,27 @@ function initSidebar() {
 
   // 桌面端折叠按钮
   if (toggleBtn && sidebar) {
-    toggleBtn.addEventListener('click', () => {
+    toggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
       if (window.innerWidth <= 1023) {
-        // 平板/手机：切换侧边栏
         sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
       } else {
-        // 桌面：折叠/展开
         sidebar.classList.toggle('collapsed');
-        const icon = toggleBtn.querySelector('img');
-        if (icon) {
+        var isCollapsed = sidebar.classList.contains('collapsed');
+        var imgIcon = toggleBtn.querySelector('img');
+        if (imgIcon) {
           var basePath = window.location.pathname.includes('/pages/') ? '../assets/icons/' : 'assets/icons/';
-          var expandIcon = basePath + 'expand.svg';
-          var collapseIcon = basePath + 'collapse.svg';
-          icon.src = sidebar.classList.contains('collapsed') ? expandIcon : collapseIcon;
-          icon.alt = sidebar.classList.contains('collapsed') ? '展开' : '折叠';
-          // 图片加载失败时回退为 Font Awesome 图标，避免 404 空白
-          icon.onerror = function() {
-            icon.outerHTML = '<i class="fas fa-arrow-left" style="font-size:16px;color:#6C3FF5;margin:0 auto;"></i>';
+          imgIcon.src = isCollapsed ? basePath + 'expand.svg' : basePath + 'collapse.svg';
+          imgIcon.alt = isCollapsed ? '展开' : '折叠';
+          imgIcon.onerror = function() {
+            imgIcon.outerHTML = '<i class="fas fa-arrow-left" style="font-size:16px;color:#6C3FF5;margin:0 auto;"></i>';
           };
+        } else {
+          // <i> 图标切换：bars ↔ arrow-left
+          var iIcon = toggleBtn.querySelector('i');
+          if (iIcon) {
+            iIcon.className = isCollapsed ? 'fas fa-arrow-left' : 'fas fa-bars';
+          }
         }
       }
     });
@@ -114,7 +193,6 @@ function initSidebar() {
     });
   }
 
-  // 点击主内容区关闭移动端侧边栏（修复因窗口尺寸判断导致的点击全屏触发）
   const mainContent = document.getElementById('mainContent');
   if (mainContent) {
     mainContent.addEventListener('click', function(e) {
@@ -122,6 +200,13 @@ function initSidebar() {
       if (window.innerWidth <= 1023 && document.getElementById('sidebar')?.classList.contains('open')) {
         closeSidebar();
       }
+    });
+  }
+
+  // 点击遮罩层关闭侧边栏（移动端）
+  if (overlay) {
+    overlay.addEventListener('click', function() {
+      closeSidebar();
     });
   }
 }
@@ -160,6 +245,10 @@ function initNavigation() {
       item.classList.add('active');
     } else if (page === 'settings' && currentPage === 'settings.html') {
       item.classList.add('active');
+    } else if (page === 'templates' && currentPage === 'templates.html') {
+      item.classList.add('active');
+    } else if (page === 'publish' && currentPage === 'publish.html') {
+      item.classList.add('active');
     }
   });
 }
@@ -190,7 +279,7 @@ function initClock() {
 }
 
 // ============================================================
-// 标签页闪烁（加分项：有新告警时闪烁标题）
+// 标签页闪烁
 // ============================================================
 
 let originalTitle = document.title;
@@ -199,7 +288,7 @@ let blinkInterval = null;
 
 /**
  * 开始闪烁标签页标题
- * @param {string} message - 闪烁时显示的消息
+ * @param {string} message
  */
 function startBlinking(message) {
   message = message || '⚠️ 新告警！';
@@ -226,9 +315,9 @@ function stopBlinking() {
 }
 
 /**
- * 检查是否有新告警并触发闪烁
- * @param {number} previousCount - 之前的告警数
- * @param {number} currentCount - 当前的告警数
+ * 检查新告警并触发闪烁
+ * @param {number} previousCount
+ * @param {number} currentCount
  */
 function checkNewAlarms(previousCount, currentCount) {
   if (currentCount > previousCount) {
@@ -245,7 +334,7 @@ function checkNewAlarms(previousCount, currentCount) {
 }
 
 // ============================================================
-// 主题切换功能（加分项）
+// 主题切换
 // ============================================================
 
 var currentTheme = localStorage.getItem('dashboard_theme') || 'dark';
@@ -294,7 +383,6 @@ function initTheme() {
 
 /**
  * 初始化通知横幅开关
- * 点击通知铃铛切换告警横幅的显示/隐藏
  */
 function initNotificationToggle() {
   var btn = document.getElementById('notificationBtn');
@@ -338,58 +426,66 @@ function initThemeToggle() {
 function initUserAvatar() {
   var avatar = document.getElementById('userAvatar');
   if (avatar) {
-    avatar.style.cursor = 'pointer';
-    avatar.addEventListener('click', function() {
-      location.href = 'pages/settings.html';
-    });
+    var user = getCurrentUser();
+    var canAccessSettings = user && user.roles && (user.roles.indexOf('dashboard_admin') !== -1 || user.roles.indexOf('workshop_supervisor') !== -1);
+
+    // 根据角色设置不同的光标样式和标题提示
+    if (canAccessSettings) {
+      avatar.style.cursor = 'pointer';
+      avatar.title = '点击进入系统设置';
+      avatar.addEventListener('click', function() {
+        // 检测当前是否在 pages/ 子目录下，正确拼接路径
+        var inSubDir = window.location.pathname.indexOf('/pages/') !== -1;
+        location.href = inSubDir ? 'settings.html' : 'pages/settings.html';
+      });
+    } else if (isOnlyViewer()) {
+      avatar.style.cursor = 'default';
+      avatar.title = '只读模式，无法访问设置';
+    } else {
+      avatar.style.cursor = 'not-allowed';
+      avatar.title = '当前角色无权限访问设置';
+      avatar.addEventListener('click', function() {
+        if (typeof showToast === 'function') showToast('⛔ 当前角色无权限访问系统设置');
+      });
+    }
+  }
+
+  // 更新顶部栏的用户名和角色显示
+  var userNameEl = document.getElementById('userNameDisplay');
+  var userRoleEl = document.getElementById('userRoleDisplay');
+  var user = getCurrentUser();
+  if (user) {
+    if (userNameEl) userNameEl.textContent = user.name || user.username;
+    if (userRoleEl) {
+      var roleTexts = (user.roles || []).map(function(r) { return getRoleText(r); }).join(' / ');
+      userRoleEl.textContent = roleTexts || '普通员工';
+    }
   }
 }
 
 // ============================================================
-// 加分项：键盘快捷键
+// 键盘快捷键
 // ============================================================
 function initKeyboardShortcuts() {
   document.addEventListener('keydown', function(e) {
+    // Ctrl+K 搜索
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
       e.preventDefault();
       var searchInput = document.getElementById('searchInput');
       if (searchInput) { searchInput.focus(); searchInput.select(); }
       return;
     }
+    // ESC 取消聚焦
     if (e.key === 'Escape') {
       var searchInput = document.getElementById('searchInput');
       if (searchInput && document.activeElement === searchInput) { searchInput.blur(); return; }
     }
+    // R 键刷新
     if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey) {
       e.preventDefault();
       var refreshBtn = document.getElementById('refreshBtn');
       if (refreshBtn) refreshBtn.click();
     }
-  });
-}
-
-// ============================================================
-// 加分项：全屏模式
-// ============================================================
-function toggleFullscreen() {
-  var el = document.documentElement;
-  if (!document.fullscreenElement) {
-    if (el.requestFullscreen) el.requestFullscreen();
-    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-    else if (el.msRequestFullscreen) el.msRequestFullscreen();
-  } else {
-    if (document.exitFullscreen) document.exitFullscreen();
-    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-    else if (document.msExitFullscreen) document.msExitFullscreen();
-  }
-}
-
-function initFullscreenBtn() {
-  var btn = document.getElementById('fullscreenBtn');
-  if (!btn) return;
-  btn.addEventListener('click', toggleFullscreen);
-  document.addEventListener('fullscreenchange', function() {
-    btn.textContent = document.fullscreenElement ? '⛶ 退出全屏' : '⛶ 全屏';
   });
 }
 

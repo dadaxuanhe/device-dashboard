@@ -1,9 +1,15 @@
 /**
- * migrate-equipment.js - 插入精确的设备数据（含完整参数 + 阈值）
+ * migrate-equipment.js - 设备数据迁移工具
+ * 
+ * 功能：将 eqData 数组中的 12 台设备完整参数（含实时值、上下限阈值）
+ *       通过 UPDATE 语句写入现有数据库设备表，保留已有 id 和关联数据。
  * 运行方式: cd backend && node migrate-equipment.js
  */
+
+// 引入数据库模块
 const { getDb, waitForDb, closeDb } = require('./database');
 
+// 12 台设备数据（编号、名称、类型、实时参数及上下限阈值）
 const eqData = [
   {id:1, equipmentNo:'EQ-001', name:'数控机床-1', type:'数控机床', model:'CNC-500', manufacturer:'沈阳机床', location:'一车间-A区', installDate:'2024-03-15', status:'online', oee:87.5, currentOutput:156, temperature:42.3, current:15.6, voltage:380, pressure:0.65, tempMin:20, tempMax:50, currentMin:10, currentMax:25, voltageMin:340, voltageMax:420, pressureMin:0.4, pressureMax:0.8},
   {id:2, equipmentNo:'EQ-002', name:'数控机床-2', type:'数控机床', model:'CNC-500', manufacturer:'沈阳机床', location:'一车间-A区', installDate:'2024-06-01', status:'online', oee:72.3, currentOutput:98, temperature:38.7, current:12.1, voltage:375, pressure:0.52, tempMin:20, tempMax:50, currentMin:10, currentMax:25, voltageMin:340, voltageMax:420, pressureMin:0.4, pressureMax:0.8},
@@ -19,11 +25,18 @@ const eqData = [
   {id:12, equipmentNo:'EQ-012', name:'3D打印机-1', type:'增材设备', model:'EOS-M290', manufacturer:'EOS', location:'研发中心-101', installDate:'2025-06-01', status:'offline', oee:0, currentOutput:0, temperature:null, current:null, voltage:null, pressure:null, tempMin:20, tempMax:30, currentMin:5, currentMax:15, voltageMin:220, voltageMax:240, pressureMin:0.1, pressureMax:0.3}
 ];
 
+/**
+ * migrate - 执行设备数据迁移
+ * 使用 UPDATE 更新已有设备的完整参数和阈值，保留已有 id 和关联数据
+ * 不会删除或重建记录，因此外键关联（告警、维修等）不受影响
+ */
 async function migrate() {
   await waitForDb();
   const db = getDb();
 
+  // 使用 db.serialize() 保证所有 UPDATE 操作按顺序串行执行
   db.serialize(() => {
+    // 预编译 UPDATE 语句（23 个参数），提高批量执行性能
     const stmt = db.prepare(`UPDATE equipment SET
       equipmentNo=?, name=?, type=?, model=?, manufacturer=?, location=?, installDate=?, status=?,
       oee=?, currentOutput=?, temperature=?, current=?, voltage=?, pressure=?,
@@ -31,17 +44,19 @@ async function migrate() {
       WHERE id=?`);
     stmt.on('error', () => {});
 
+    // 遍历所有 12 台设备，逐条执行更新
     eqData.forEach(e => {
       stmt.run(e.equipmentNo, e.name, e.type, e.model, e.manufacturer, e.location, e.installDate, e.status,
         e.oee, e.currentOutput, e.temperature, e.current, e.voltage, e.pressure,
         e.tempMin, e.tempMax, e.currentMin, e.currentMax, e.voltageMin, e.voltageMax, e.pressureMin, e.pressureMax,
         e.id);
     });
-    stmt.finalize();
+    stmt.finalize();  // 释放预编译语句
   });
 
   console.log('✅ 已更新 ' + eqData.length + ' 条设备数据（含完整参数+阈值，关联数据已保留）');
-  closeDb();
+  closeDb();  // 关闭数据库连接
 }
 
+// 直接运行本文件时执行迁移
 migrate();

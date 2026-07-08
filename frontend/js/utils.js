@@ -1,22 +1,15 @@
 /**
  * utils.js - 工具函数集合
  *
- * 职责：
- * 1. 防抖函数 (debounce)          [export]
- * 2. 日期格式化 (formatDate)       [export]
- * 3. 状态颜色映射 (getStatusColor) [export]
- * 4. 状态文本映射 (getStatusText)  [export]
- * 5. 其他辅助函数（内部使用）
- *
- * 兼容说明：状态映射同时支持新旧命名（online↔running, warning↔idle, error↔fault），
- *           确保数据库旧数据与前端新命名均能正确渲染。
+ * 防抖、日期格式化、状态映射、CSV 导出、角色权限、Toast 等。
+ * 状态映射兼容新旧命名（online↔running, warning↔idle, error↔fault）。
  */
 
 /**
- * 防抖函数 - 限制高频触发
- * @param {Function} fn - 需要防抖的函数
- * @param {number} delay - 延迟时间（毫秒），默认 300
- * @returns {Function} 防抖后的函数
+ * 防抖函数
+ * @param {Function} fn
+ * @param {number} delay - 延迟毫秒数，默认 300
+ * @returns {Function}
  */
 function debounce(fn, delay = 300) {
   let timer = null;
@@ -75,7 +68,7 @@ function formatTime(date) {
 
 /**
  * 获取状态颜色
- * @param {string} status - 状态值（支持新旧命名：online/running/warning/idle/error/fault/offline）
+ * @param {string} status
  * @returns {string} 十六进制颜色值
  */
 function getStatusColor(status) {
@@ -108,7 +101,7 @@ function getStatusClass(status) {
 
 /**
  * 获取状态文本
- * @param {string} status - 状态值（支持新旧命名）
+ * @param {string} status
  * @returns {string} 中文状态名
  */
 function getStatusText(status) {
@@ -181,7 +174,7 @@ function getAlarmStatusClass(status) {
 }
 
 /**
- * 格式化数字（添加千分位分隔符）
+ * 格式化数字（千分位）
  * @param {number} num
  * @returns {string}
  */
@@ -242,7 +235,7 @@ function exportToCSV(data, columns, filename) {
 }
 
 // ============================================================
-// 工具函数 - 告警模块
+// 告警相关
 // ============================================================
 
 /**
@@ -276,6 +269,85 @@ function getTimeAgo(dateStr) {
 }
 
 // ==========================================
+// 角色权限工具函数
+// ==========================================
+
+/**
+ * 获取当前登录用户信息
+ * @returns {object|null} { id, username, name, roles }
+ */
+function getCurrentUser() {
+  try {
+    return JSON.parse(sessionStorage.getItem('userInfo') || 'null');
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * 检查当前用户是否拥有指定角色
+ * @param {string} role - 角色名（dashboard_admin / workshop_supervisor / maintenance_tech / viewer）
+ * @returns {boolean}
+ */
+function hasRole(role) {
+  var user = getCurrentUser();
+  return user && user.roles && user.roles.indexOf(role) !== -1;
+}
+
+/**
+ * 检查当前用户是否只有普通员工角色（只读模式）
+ * @returns {boolean}
+ */
+function isOnlyViewer() {
+  var user = getCurrentUser();
+  if (!user || !user.roles) return false;
+  return user.roles.length === 1 && user.roles[0] === 'viewer';
+}
+
+/**
+ * 角色中文名映射
+ */
+var ROLE_NAMES = {
+  dashboard_admin: '看板管理员',
+  workshop_supervisor: '车间主管',
+  maintenance_tech: '设备维修员',
+  viewer: '普通员工'
+};
+
+/**
+ * 获取角色中文名
+ * @param {string} role
+ * @returns {string}
+ */
+function getRoleText(role) {
+  return ROLE_NAMES[role] || role;
+}
+
+/**
+ * 全局 Toast 消息提示（供各页面通用）
+ * 如果页面已有自己的 showToast 则不覆盖
+ */
+if (typeof window !== 'undefined' && typeof window.showToast !== 'function') {
+  window.showToast = function(msg) {
+    var el = document.getElementById('toastMessage');
+    if (!el) {
+      // 动态创建 toast 元素
+      el = document.createElement('div');
+      el.id = 'toastMessage';
+      el.style.cssText = 'position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(20px);padding:12px 24px;background:rgba(0,230,118,0.12);color:#00e676;border:1px solid #00e676;border-radius:8px;font-size:14px;font-weight:500;opacity:0;pointer-events:none;transition:all 0.4s ease;z-index:9999;white-space:nowrap;';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.style.opacity = '1';
+    el.style.transform = 'translateX(-50%) translateY(0)';
+    setTimeout(function() {
+      el.style.opacity = '0';
+      el.style.transform = 'translateX(-50%) translateY(20px)';
+    }, 3000);
+  };
+}
+
+// ==========================================
 // 全局导出（兼容 <script> 标签非模块加载）
 // ==========================================
 if (typeof window !== 'undefined') {
@@ -292,4 +364,9 @@ if (typeof window !== 'undefined') {
   window.formatNumber = formatNumber;
   window.getDeviceTypeIcon = getDeviceTypeIcon;
   window.exportToCSV = exportToCSV;
+  window.getCurrentUser = getCurrentUser;
+  window.hasRole = hasRole;
+  window.isOnlyViewer = isOnlyViewer;
+  window.getRoleText = getRoleText;
+  window.ROLE_NAMES = ROLE_NAMES;
 }

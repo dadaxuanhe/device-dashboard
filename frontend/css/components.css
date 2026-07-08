@@ -14,21 +14,21 @@
 /* ============================================ */
 /* KPI 卡片
  * 深色背景 #141b2d（通过 CSS 变量 var(--bg-card)），圆角 12px，内边距 20px
- * 左侧 4px 色条表示不同状态
- * 数字 32px 加粗
+ * 左侧 4px 色条表示不同状态（运行中/待机/故障/离线）
+ * 数字 32px 加粗等宽字体
  * 告警卡片含呼吸光晕动画（仅告警 > 0 时触发）
  * ============================================ */
 .kpi-card {
-  background: var(--bg-card);           /* #141b2d */
-  border-radius: var(--radius-lg);       /* 12px */
-  padding: var(--space-lg);              /* 20px */
+  background: var(--bg-card);           /* 深色卡片背景 #141b2d */
+  border-radius: var(--radius-lg);       /* 12px 圆角 */
+  padding: var(--space-lg);              /* 20px 内边距 */
   border: 1px solid var(--border-color);
   transition: all var(--transition-normal);
-  position: relative;
+  position: relative;                    /* 为 ::before 伪元素定位 */
   overflow: hidden;
 }
 
-/* 左侧 4px 色条 */
+/* 左侧 4px 色条（通过伪元素实现） */
 .kpi-card::before {
   content: '';
   position: absolute;
@@ -39,18 +39,18 @@
   opacity: 0.8;
 }
 
-/* 状态色条 */
-.status-running::before { background: var(--color-success); }   /* 绿 #00e676 */
-.status-idle::before    { background: var(--color-warning); }    /* 黄 #ffd740 */
-.status-fault::before   { background: var(--color-danger); }     /* 红 #ff1744 */
-.status-offline::before { background: var(--color-info); }       /* 灰 #546e7a */
+/* 各类状态的色条颜色 */
+.status-running::before { background: var(--color-success); }   /* 运行中 → 绿色 #00e676 */
+.status-idle::before    { background: var(--color-warning); }    /* 待机 → 黄色 #ffd740 */
+.status-fault::before   { background: var(--color-danger); }     /* 故障 → 红色 #ff1744 */
+.status-offline::before { background: var(--color-info); }       /* 离线 → 灰色 #546e7a */
 
-/* 默认色条（无状态修饰的卡片：总数/产量/OEE 用蓝色） */
+/* 默认色条（无状态修饰的卡片：总数/产量/OEE 使用品牌蓝） */
 .kpi-card:not([class*='status-'])::before { background: var(--color-primary); }
 
 .kpi-card:hover {
   background: var(--bg-card-hover);
-  transform: translateY(-2px);
+  transform: translateY(-2px);                  /* 悬停上浮效果 */
   box-shadow: var(--shadow-md);
 }
 
@@ -67,12 +67,12 @@
   margin-bottom: var(--space-md);
 }
 
-/* 数字：32px 加粗 */
+/* 数字：32px 加粗等宽字体 */
 .kpi-number {
   font-size: 2rem;            /* 32px */
   font-weight: 700;
   color: var(--text-white);
-  font-family: var(--font-mono);
+  font-family: var(--font-mono);               /* 等宽字体便于数字对齐 */
   line-height: 1.2;
   margin-bottom: 4px;
 }
@@ -111,7 +111,8 @@
 }
 
 /* ============================================ */
-/* 图表卡片 */
+/* 图表卡片（ECharts 容器） */
+/* ============================================ */
 .chart-card {
   background: var(--bg-card);
   border-radius: var(--radius-lg);
@@ -121,7 +122,7 @@
 }
 
 .chart-card:hover {
-  box-shadow: var(--shadow-glow);
+  box-shadow: var(--shadow-glow);             /* 悬停发光效果 */
 }
 
 .chart-card-header {
@@ -136,28 +137,28 @@
   font-weight: 600;
 }
 
-.chart-container {
+.chart-container {                             /* ECharts 渲染容器 */
   width: 100%;
   height: 100%;
-  min-height: 300px;
+  min-height: 300px;                            /* 最低高度保证可读 */
 }
 
 .chart-card--small .chart-container {
-  min-height: 250px;
+  min-height: 250px;                           /* 小型卡片减少高度 */
 }
 
 /* ============================================ */
-/* 时间范围按钮 */
+/* 时间范围切换按钮（图表用） */
 /* ============================================ */
 .chart-time-range {
   display: flex;
   gap: 4px;
   background: var(--bg-secondary);
   border-radius: var(--radius-md);
-  padding: 3px;
+  padding: 3px;                                /* 内边距产生按钮组间距 */
 }
 
-.time-btn {
+.time-btn {                                    /* 单个时间按钮 */
   padding: 4px 12px;
   font-size: 0.8rem;
   color: var(--text-secondary);
@@ -170,7 +171,7 @@
   background: var(--bg-card);
 }
 
-.time-btn.active {
+.time-btn.active {                             /* 选中态：品牌蓝背景白字 */
   color: var(--text-white);
   background: var(--color-primary);
 }
@@ -179,28 +180,29 @@
 /* 设备卡片
  * 背景 #1a2335（var(--bg-card-hover)），圆角 12px，hover 上浮效果
  * 顶部：设备名称 + 状态指示灯（12px 圆形）
- * 中部：编号、类型、指标
+ * 中部：设备编号、类型、稼动率/产量指标
  * 底部：状态文字（颜色与状态匹配）
-/* ============================================ */
+ * ============================================ */
 .device-card {
-  background: var(--bg-card-hover);      /* #1a2335 */
-  border-radius: var(--radius-lg);        /* 12px */
+  background: var(--bg-card-hover);      /* 卡片背景 #1a2335 */
+  border-radius: var(--radius-lg);        /* 12px 圆角 */
   border: 1px solid var(--border-color);
   padding: var(--space-lg);
   transition: all var(--transition-normal);
-  cursor: pointer;
+  cursor: pointer;                         /* 整张卡片可点击 */
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
+  position: relative;                      /* 为收藏星标等绝对定位元素定位 */
 }
 
 .device-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-4px);            /* 悬停上浮 */
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-  border-color: var(--color-primary);
+  border-color: var(--color-primary);      /* 边框变品牌蓝 */
 }
 
-/* 顶部：名称 + 状态指示灯 */
+/* 顶部：设备名称 + 状态指示灯 */
 .device-header {
   display: flex;
   align-items: center;
@@ -213,7 +215,7 @@
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-overflow: ellipsis;                 /* 过长的设备名显示省略号 */
 }
 
 /* 状态指示灯：12px 圆形 */
@@ -223,37 +225,37 @@
   border-radius: 50%;
   flex-shrink: 0;
 }
-.status-dot.status-online  { background: var(--color-success); box-shadow: 0 0 8px var(--color-success); }
-.status-dot.status-warning { background: var(--color-warning); box-shadow: 0 0 8px var(--color-warning); }
-.status-dot.status-error   { background: var(--color-danger);  box-shadow: 0 0 8px var(--color-danger); }
-.status-dot.status-offline { background: var(--color-info); }
+.status-dot.status-online  { background: var(--color-success); box-shadow: 0 0 8px var(--color-success); }   /* 运行中 → 绿色发光 */
+.status-dot.status-warning { background: var(--color-warning); box-shadow: 0 0 8px var(--color-warning); }   /* 待机 → 黄色发光 */
+.status-dot.status-error   { background: var(--color-danger);  box-shadow: 0 0 8px var(--color-danger); }     /* 故障 → 红色发光 */
+.status-dot.status-offline { background: var(--color-info); }                                                /* 离线 → 灰色 */
 
-/* 中部 */
+/* 中部信息区域 */
 .device-body {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.device-code {
+.device-code {                               /* 设备编号 */
   font-size: 0.75rem;
   color: var(--text-secondary);
   font-family: var(--font-mono);
 }
 
-.device-type {
+.device-type {                               /* 设备类型 */
   font-size: 0.8rem;
   color: var(--text-secondary);
 }
 
-/* 指标行 */
+/* 指标行（稼动率、产量） */
 .device-metrics {
   display: flex;
   gap: var(--space-md);
   margin-top: 4px;
 }
 
-.metric {
+.metric {                                    /* 单个指标项 */
   font-size: 0.8rem;
   color: var(--text-secondary);
 }
@@ -269,17 +271,18 @@
   border-top: 1px solid var(--border-color);
 }
 
-.status-text {
+.status-text {                               /* 底部状态文字 */
   font-size: 0.8rem;
   font-weight: 500;
 }
-.status-text.status-online  { color: #00a86b; }
-.status-text.status-warning { color: #e6a800; }
-.status-text.status-error   { color: #dc2626; }
-.status-text.status-offline { color: #64748b; }
+.status-text.status-online  { color: #00a86b; }   /* 运行中 */
+.status-text.status-warning { color: #e6a800; }   /* 待机 */
+.status-text.status-error   { color: #dc2626; }   /* 故障 */
+.status-text.status-offline { color: #64748b; }   /* 离线 */
 
 /* ============================================ */
-/* 参数卡片 */
+/* 参数卡片（设备详情页性能指标展示用） */
+/* ============================================ */
 .param-card {
   background: var(--bg-card);
   border-radius: var(--radius-lg);
@@ -295,27 +298,27 @@
   box-shadow: var(--shadow-md);
 }
 
-.param-label {
+.param-label {                               /* 参数名称标签 */
   font-size: 0.85rem;
   color: var(--text-secondary);
   margin-bottom: var(--space-sm);
 }
 
-.param-value {
+.param-value {                               /* 参数数值，大号等宽字体 */
   font-size: 1.75rem;
   font-weight: 700;
   color: var(--text-white);
   font-family: var(--font-mono);
 }
 
-.param-unit {
+.param-unit {                                /* 参数单位 */
   font-size: 0.8rem;
   color: var(--text-muted);
   margin-top: 4px;
 }
 
 /* ============================================ */
-/* 状态指示灯 */
+/* 状态指示灯（通用组件） */
 /* ============================================ */
 .status-light {
   display: inline-flex;
@@ -324,6 +327,7 @@
   font-size: 0.85rem;
 }
 
+/* 通过 ::before 伪元素显示 8px 彩色圆点 */
 .status-light::before {
   content: '';
   width: 8px;
@@ -332,12 +336,12 @@
   display: inline-block;
 }
 
-.status-light--online::before { background: var(--color-success); box-shadow: 0 0 6px var(--color-success); }
-.status-light--warning::before { background: var(--color-warning); box-shadow: 0 0 6px var(--color-warning); }
-.status-light--error::before { background: var(--color-danger); box-shadow: 0 0 6px var(--color-danger); }
-.status-light--offline::before { background: var(--color-info); }
+.status-light--online::before { background: var(--color-success); box-shadow: 0 0 6px var(--color-success); }   /* 运行中绿点 */
+.status-light--warning::before { background: var(--color-warning); box-shadow: 0 0 6px var(--color-warning); }   /* 警告黄点 */
+.status-light--error::before { background: var(--color-danger); box-shadow: 0 0 6px var(--color-danger); }       /* 故障红点 */
+.status-light--offline::before { background: var(--color-info); }                                                /* 离线灰点 */
 
-/* 详情页大号状态灯 */
+/* 详情页大号状态灯（16px） */
 .detail-status-light {
   width: 16px;
   height: 16px;
@@ -345,28 +349,28 @@
   flex-shrink: 0;
 }
 
-.detail-status-light.online { background: var(--color-success); box-shadow: 0 0 12px var(--color-success); }
-.detail-status-light.warning { background: var(--color-warning); box-shadow: 0 0 12px var(--color-warning); }
-.detail-status-light.error { background: var(--color-danger); box-shadow: 0 0 12px var(--color-danger); }
-.detail-status-light.offline { background: var(--color-info); }
+.detail-status-light.online { background: var(--color-success); box-shadow: 0 0 12px var(--color-success); }     /* 运行中绿 */
+.detail-status-light.warning { background: var(--color-warning); box-shadow: 0 0 12px var(--color-warning); }     /* 警告黄 */
+.detail-status-light.error { background: var(--color-danger); box-shadow: 0 0 12px var(--color-danger); }         /* 故障红 */
+.detail-status-light.offline { background: var(--color-info); }                                                  /* 离线灰 */
 
 /* ============================================ */
-/* 按钮 */
+/* 按钮（通用组件） */
 /* ============================================ */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 6px;                                     /* 图标与文字间距 */
   padding: 8px 16px;
   font-size: 0.875rem;
   font-weight: 500;
   border-radius: var(--radius-md);
   transition: all var(--transition-fast);
-  white-space: nowrap;
+  white-space: nowrap;                           /* 禁止按钮内文字换行 */
 }
 
-.btn--primary {
+.btn--primary {                                  /* 主要按钮：品牌蓝背景白字 */
   background: var(--color-primary);
   color: var(--text-white);
 }
@@ -375,7 +379,7 @@
   background: var(--color-primary-hover);
 }
 
-.btn--secondary {
+.btn--secondary {                                /* 次要按钮：透明背景带边框 */
   background: var(--bg-card);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
@@ -386,7 +390,7 @@
   border-color: var(--text-muted);
 }
 
-.btn--danger {
+.btn--danger {                                   /* 危险按钮：红色系 */
   background: var(--color-danger-bg);
   color: var(--color-danger);
   border: 1px solid transparent;
@@ -397,7 +401,7 @@
   color: var(--text-white);
 }
 
-.btn--success {
+.btn--success {                                  /* 成功按钮：绿色系 */
   background: var(--color-success-bg);
   color: var(--color-success);
   border: 1px solid transparent;
@@ -408,23 +412,52 @@
   color: var(--text-white);
 }
 
-.btn--sm {
+/* ============================================ */
+/* 告警闪烁动画（紧急告警时触发） */
+/* ============================================ */
+@keyframes alarm-flash {                       /* 闪烁：透明度交替变化 */
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+@keyframes alarm-pulse {                       /* 脉冲：光晕向外扩散 */
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,23,68,0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(255,23,68,0); }
+}
+.alarm-flash-critical {                        /* 紧急告警快闪（1.2s） */
+  animation: alarm-flash 1.2s ease-in-out infinite;
+}
+.alarm-flash-warning {                         /* 重要告警慢闪（2s） */
+  animation: alarm-flash 2s ease-in-out infinite;
+}
+.alarm-pulse {
+  animation: alarm-pulse 1.5s ease-in-out infinite;
+}
+.nav-badge.has-active {                        /* 侧边栏告警徽章闪烁 */
+  animation: alarm-flash 1s ease-in-out infinite;
+  background: #ff1744 !important;
+}
+#notificationBtn.has-active {                  /* 通知铃铛按钮闪烁 */
+  color: #ff1744 !important;
+  animation: alarm-flash 1.2s ease-in-out infinite;
+}
+
+.btn--sm {                                     /* 小型按钮 */
   padding: 4px 10px;
   font-size: 0.8rem;
 }
 
 /* ============================================ */
-/* 筛选按钮 */
+/* 筛选按钮组 */
 /* ============================================ */
 .filter-group {
   display: flex;
   gap: 4px;
   background: var(--bg-secondary);
   border-radius: var(--radius-md);
-  padding: 3px;
+  padding: 3px;                                /* 内边距产生按钮间距 */
 }
 
-.filter-btn {
+.filter-btn {                                  /* 单个筛选按钮 */
   padding: 6px 14px;
   font-size: 0.8rem;
   color: var(--text-secondary);
@@ -437,12 +470,14 @@
   background: var(--bg-card);
 }
 
-.filter-btn.active {
+.filter-btn.active {                           /* 选中态：品牌蓝背景白字 */
   color: var(--text-white);
   background: var(--color-primary);
 }
 
-/* 视图切换 */
+/* ============================================ */
+/* 视图切换（卡片/列表） */
+/* ============================================ */
 .view-toggle {
   display: flex;
   gap: 4px;
@@ -451,7 +486,7 @@
   padding: 3px;
 }
 
-.view-btn {
+.view-btn {                                    /* 单个视图切换按钮 */
   padding: 6px 12px;
   font-size: 0.8rem;
   color: var(--text-secondary);
@@ -463,7 +498,7 @@
   color: var(--text-primary);
 }
 
-.view-btn.active {
+.view-btn.active {                             /* 选中态 */
   color: var(--text-white);
   background: var(--color-primary);
 }

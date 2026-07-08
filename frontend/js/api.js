@@ -1,56 +1,35 @@
 /**
- * api.js - API 调用封装模块
+ * api.js - API 请求封装模块
  *
- * 职责：
- * 1. 封装所有后端 API 请求（基于 fetch）
- * 2. 可配置 BASE_URL 指向后端服务
- * 3. 统一检查 code 字段，自动提取 data
- * 4. 统一错误处理：console.error + 抛出错误
- *
- * 导出函数（ES module）：
- * - getEquipment(params)       - 获取设备列表（支持筛选搜索）
- * - getStats()                 - 获取看板 KPI 统计数据
- * - getEquipmentDetail(id)     - 获取设备详情（含实时参数）
- *
- * 内部函数：
- * - getProduction(params)      - 获取产量记录
- * - getAlarms(params)          - 获取告警列表
- * - getAlarmSummary()          - 获取告警统计摘要
- * - confirmAlarm(id, body)     - 确认告警
- * - clearAlarm(id)             - 清除告警
- * - getEquipmentFullDetail(id) - 获取设备完整详情（聚合数据）
- * - getPersonnel()             - 获取人员列表
- * - getOperations(params)      - 获取操作日志
- * - getTemperature(params)     - 获取温度记录
- * - getMaintenance(params)     - 获取维修记录
+ * 职责：封装所有后端 API 请求（基于 fetch），自动附加用户 ID 头，
+ * 统一检查业务状态码，兼容分页对象和数组两种 data 格式。
  */
 
-/**
- * 后端 API 基础地址（可配置）
- * 使用相对路径，自动适配当前域名和端口，方便局域网访问
- */
+/** 后端 API 基础地址 */
 const BASE_URL = '/api';
 
 /**
  * 通用请求函数
- * - 拼接 BASE_URL + endpoint
- * - 统一检查 code 字段（仅 code === 0 视为成功）
- * - 自动提取 data 字段返回
- * - 统一错误处理：console.error + 抛出错误
- *
- * @param {string} endpoint - API 端点（如 '/equipment'）
+ * @param {string} endpoint - API 端点
  * @param {object} options - fetch 选项
- * @returns {Promise<*>} 后端返回的 data 字段内容
+ * @returns {Promise<*>} 后端返回的 data 字段
  */
 async function request(endpoint, options = {}) {
   const url = `${BASE_URL}${endpoint}`;
 
   try {
+    // 自动附加用户ID头（用于后端角色权限校验）
+    const userInfo = (() => {
+      try { return JSON.parse(sessionStorage.getItem('userInfo') || '{}'); } catch(e) { return {}; }
+    })();
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-User-Id': userInfo.id || '',
+      ...options.headers
+    };
+
     const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-      },
+      headers,
       ...options
     });
 
@@ -91,6 +70,35 @@ async function getEquipment(params = {}) {
   if (params.keyword) query.set('keyword', params.keyword);
   const qs = query.toString();
   return request(`/equipment${qs ? '?' + qs : ''}`);
+}
+
+// 添加新设备
+async function addEquipment(data) {
+  return request('/equipment', { method: 'POST', body: JSON.stringify(data) });
+}
+
+/**
+ * 获取下一个可用的设备编号
+ * GET /api/equipment/next-no
+ * @returns {Promise<string>} 下一个编号，如 "EQ-014"
+ */
+/**
+ * 获取下一个可用的设备编号（自动生成 EQ-xxx 递增）
+ * GET /api/equipment/next-no
+ * @returns {Promise<string>} 下一个编号，如 "EQ-014"
+ */
+async function getNextEquipmentNo() {
+  return request('/equipment/next-no');
+}
+
+/**
+ * 删除设备（级联删除关联子表数据）
+ * DELETE /api/equipment/:id
+ * @param {number} id - 设备 ID
+ * @returns {Promise<null>} 成功返回 null
+ */
+async function deleteEquipment(id) {
+  return request('/equipment/' + id, { method: 'DELETE' });
 }
 
 /**
@@ -224,17 +232,25 @@ async function getPersonnel() {
   return request('/personnel');
 }
 
-// ===== 新增：值班人员 API =====
+// 值班人员 API
 async function getStaff() {
   return request('/staff');
 }
+// 添加值班人员
+async function addStaff(data) {
+  return request('/staff', { method: 'POST', body: data });
+}
+// 删除值班人员
+async function deleteStaff(id) {
+  return request('/staff/' + id, { method: 'DELETE' });
+}
 
-// ===== 新增：用户列表 API（用于设置页面） =====
+// 用户管理 API
 async function getUsers() {
   return request('/users');
 }
 
-// ===== 新增：用户管理 API =====
+// 注册新用户
 async function registerUser(data) {
   return request('/auth/register', {
     method: 'POST',
@@ -242,10 +258,12 @@ async function registerUser(data) {
   });
 }
 
+// 删除用户
 async function deleteUser(id) {
   return request('/users/' + id, { method: 'DELETE' });
 }
 
+/** POST /api/users/change-password - 修改密码 */
 async function changePassword(data) {
   return request('/users/change-password', {
     method: 'POST',
@@ -253,7 +271,7 @@ async function changePassword(data) {
   });
 }
 
-// ===== 新增：操作记录 API =====
+// 操作记录 API
 async function getOpLog(params = {}) {
   const query = new URLSearchParams();
   if (params.person) query.set('person', params.person);
@@ -261,9 +279,167 @@ async function getOpLog(params = {}) {
   return request(`/op_log${qs ? '?' + qs : ''}`);
 }
 
-// ===== 新增：绩效 API =====
+// 绩效 API
 async function getPerformance() {
   return request('/performance');
+}
+
+// 数据源管理 API
+async function getDataSources() {
+  return request('/data-sources');
+}
+// 新增数据源
+async function addDataSource(data) {
+  return request('/data-sources', { method: 'POST', body: JSON.stringify(data) });
+}
+// 更新数据源
+async function updateDataSource(id, data) {
+  return request('/data-sources/' + id, { method: 'PUT', body: JSON.stringify(data) });
+}
+// 删除数据源
+async function deleteDataSource(id) {
+  return request('/data-sources/' + id, { method: 'DELETE' });
+}
+// 测试数据源连接
+async function testDataSource(id) {
+  return request('/data-sources/' + id + '/test', { method: 'POST' });
+}
+
+// 告警规则管理 API
+async function getAlarmRules(params = {}) {
+  const query = new URLSearchParams();
+  if (params.equipmentId) query.set('equipmentId', params.equipmentId);
+  const qs = query.toString();
+  return request('/alarm-rules' + (qs ? '?' + qs : ''));
+}
+// 新增告警规则
+async function addAlarmRule(data) {
+  return request('/alarm-rules', { method: 'POST', body: JSON.stringify(data) });
+}
+// 更新告警规则
+async function updateAlarmRule(id, data) {
+  return request('/alarm-rules/' + id, { method: 'PUT', body: JSON.stringify(data) });
+}
+// 删除告警规则
+async function deleteAlarmRule(id) {
+  return request('/alarm-rules/' + id, { method: 'DELETE' });
+}
+
+// 告警统计 API
+async function getAlarmStatsByDevice(params = {}) {
+  const query = new URLSearchParams();
+  if (params.range) query.set('range', params.range);
+  const qs = query.toString();
+  return request('/alarms/stats/by-device' + (qs ? '?' + qs : ''));
+}
+// 按级别统计告警
+async function getAlarmStatsByLevel() {
+  return request('/alarms/stats/by-level');
+}
+// 按时间统计告警
+async function getAlarmStatsByTime(params = {}) {
+  const query = new URLSearchParams();
+  if (params.range) query.set('range', params.range);
+  const qs = query.toString();
+  return request('/alarms/stats/by-time' + (qs ? '?' + qs : ''));
+}
+
+// 人员管理 API
+async function addPersonnel(data) {
+  return request('/personnel', { method: 'POST', body: JSON.stringify(data) });
+}
+// 更新人员
+async function updatePersonnel(id, data) {
+  return request('/personnel/' + id, { method: 'PUT', body: JSON.stringify(data) });
+}
+// 删除人员
+async function deletePersonnel(id) {
+  return request('/personnel/' + id, { method: 'DELETE' });
+}
+
+// 看板模板管理 API
+async function getBoardTemplates() {
+  return request('/board-templates');
+}
+// 获取模板详情（含组件）
+async function getBoardTemplateDetail(id) {
+  return request('/board-templates/' + id);
+}
+// 创建模板
+async function createBoardTemplate(data) {
+  return request('/board-templates', { method: 'POST', body: JSON.stringify(data) });
+}
+// 更新模板
+async function updateBoardTemplate(id, data) {
+  return request('/board-templates/' + id, { method: 'PUT', body: JSON.stringify(data) });
+}
+// 删除模板
+async function deleteBoardTemplate(id) {
+  return request('/board-templates/' + id, { method: 'DELETE' });
+}
+// 添加组件到模板
+async function addTemplateComponent(templateId, data) {
+  return request('/board-templates/' + templateId + '/components', { method: 'POST', body: JSON.stringify(data) });
+}
+// 更新模板组件
+async function updateTemplateComponent(templateId, compId, data) {
+  return request('/board-templates/' + templateId + '/components/' + compId, { method: 'PUT', body: JSON.stringify(data) });
+}
+// 移除模板组件
+async function removeTemplateComponent(templateId, compId) {
+  return request('/board-templates/' + templateId + '/components/' + compId, { method: 'DELETE' });
+}
+
+// 组件库 API
+async function getComponentLibrary() {
+  return request('/component-library');
+}
+
+// 看板实例管理 API
+async function getBoardInstances() {
+  return request('/board-instances');
+}
+async function createBoardInstance(data) {
+  return request('/board-instances', { method: 'POST', body: JSON.stringify(data) });
+}
+async function updateBoardInstance(id, data) {
+  return request('/board-instances/' + id, { method: 'PUT', body: JSON.stringify(data) });
+}
+async function deleteBoardInstance(id) {
+  return request('/board-instances/' + id, { method: 'DELETE' });
+}
+async function publishBoardInstance(id, status) {
+  return request('/board-instances/' + id + '/publish', { method: 'POST', body: JSON.stringify({ status }) });
+}
+async function getBoardRenderData(id) {
+  return request('/board-instances/' + id + '/render');
+}
+
+// 展示终端管理 API
+async function getDisplayTerminals() {
+  return request('/display-terminals');
+}
+async function registerDisplayTerminal(data) {
+  return request('/display-terminals', { method: 'POST', body: JSON.stringify(data) });
+}
+async function updateDisplayTerminal(id, data) {
+  return request('/display-terminals/' + id, { method: 'PUT', body: JSON.stringify(data) });
+}
+async function deleteDisplayTerminal(id) {
+  return request('/display-terminals/' + id, { method: 'DELETE' });
+}
+
+// 维修记录 API
+async function createMaintenanceFromAlarm(data) {
+  return request('/maintenance/from-alarm', { method: 'POST', body: JSON.stringify(data) });
+}
+// 更新维修记录
+async function updateMaintenance(id, data) {
+  return request('/maintenance/' + id, { method: 'PUT', body: JSON.stringify(data) });
+}
+// 获取告警关联的维修记录
+async function getAlarmMaintenance(alarmId) {
+  return request('/maintenance?alarm_id=' + alarmId);
 }
 
 /**
@@ -290,12 +466,14 @@ async function getOperations(params = {}) {
  */
 async function getTemperature(params = {}) {
   const query = new URLSearchParams();
+  // 优先使用 range 参数，若无则尝试兼容旧的 hours 参数
   if (params.range) query.set('range', params.range);
   else if (params.hours) {
     // 旧参数 hours → 映射到 range
     if (params.hours <= 24) query.set('range', 'today');
     else query.set('range', '7d');
   }
+  // 默认查询范围为 7 天
   else query.set('range', '7d');
   if (params.equipment_id) query.set('equipmentId', params.equipment_id);
   else if (params.equipmentId) query.set('equipmentId', params.equipmentId);
@@ -335,11 +513,35 @@ async function getMaintenance(params = {}) {
   return request(`/maintenance${qs ? '?' + qs : ''}`);
 }
 
+/**
+ * 获取当前用户的收藏设备ID列表
+ * GET /api/favorites
+ * @returns {Promise<Array<number>>} 收藏的设备ID数组
+ */
+async function getFavorites() {
+  return request('/favorites');
+}
+
+/**
+ * 切换设备收藏状态
+ * POST /api/favorites/toggle
+ * @param {number} equipmentId - 设备ID
+ * @returns {Promise<Object>} { favorited: boolean }
+ */
+async function toggleFavorite(equipmentId) {
+  return request('/favorites/toggle', {
+    method: 'POST',
+    body: JSON.stringify({ equipmentId })
+  });
+}
+
 // ==========================================
 // 全局导出
 // ==========================================
 if (typeof window !== 'undefined') {
   window.getEquipment = getEquipment;
+  window.addEquipment = addEquipment;
+  window.deleteEquipment = deleteEquipment;
   window.getStats = getStats;
   window.getEquipmentDetail = getEquipmentDetail;
   window.getEquipmentTemperature = getEquipmentTemperature;
@@ -354,6 +556,8 @@ if (typeof window !== 'undefined') {
   window.getEquipmentFullDetail = getEquipmentFullDetail;
   window.getPersonnel = getPersonnel;
   window.getStaff = getStaff;
+  window.addStaff = addStaff;
+  window.deleteStaff = deleteStaff;
   window.getUsers = getUsers;
   window.registerUser = registerUser;
   window.deleteUser = deleteUser;
@@ -362,4 +566,8 @@ if (typeof window !== 'undefined') {
   window.getPerformance = getPerformance;
   window.getOperations = getOperations;
   window.getMaintenance = getMaintenance;
+  window.getFavorites = getFavorites;
+  window.toggleFavorite = toggleFavorite;
+  window.getNextEquipmentNo = getNextEquipmentNo;
+  window.addEquipment = addEquipment;
 }

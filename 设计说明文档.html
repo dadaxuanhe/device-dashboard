@@ -103,6 +103,15 @@
     .topbar__btn:hover { border-color: var(--brand); color: var(--brand); }
     .topbar__btn--primary { background: var(--brand); border-color: var(--brand); color: #fff; }
     .topbar__btn--primary:hover { background: var(--brand-hover); color: #fff; }
+    .topbar__btn--danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+    .topbar__btn--danger:hover { background: #dc2626; color: #fff; }
+    .topbar__status { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; border: 1px solid var(--border); background: var(--bg-card); cursor: default; user-select: none; }
+    .topbar__status .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .topbar__status .dot--off { background: #9ca3af; }
+    .topbar__status .dot--on { background: var(--success); box-shadow: 0 0 6px rgba(16,185,129,0.5); }
+    .topbar__status--off { color: var(--text-muted); }
+    .topbar__status--on { color: var(--success); border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.06); }
+    .topbar__btn--disabled { opacity: 0.45; pointer-events: none; cursor: not-allowed; }
     .content { max-width: 860px; margin: 0 auto; padding: 40px 48px 80px; }
     .content h1 { font-size: 36px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 8px; color: var(--text-primary); }
     .content h1 + .subtitle { font-size: 16px; color: var(--text-secondary); margin-bottom: 40px; }
@@ -188,10 +197,11 @@
     <a href="#s4" class="sidebar__nav-link"><span class="toc-num">04</span> 数据库设计</a>
     <a href="#s5" class="sidebar__nav-link"><span class="toc-num">05</span> API 接口清单</a>
     <a href="#s6" class="sidebar__nav-link"><span class="toc-num">06</span> 模拟数据</a>
-    <a href="#s7" class="sidebar__nav-link"><span class="toc-num">07</span> 功能实现</a>
-    <a href="#s8" class="sidebar__nav-link"><span class="toc-num">08</span> 问题与方案</a>
-    <a href="#s9" class="sidebar__nav-link"><span class="toc-num">09</span> 使用说明</a>
-    <a href="#s10" class="sidebar__nav-link"><span class="toc-num">10</span> 总结与反思</a>
+    <a href="#s7" class="sidebar__nav-link"><span class="toc-num">07</span> 角色权限体系</a>
+    <a href="#s8" class="sidebar__nav-link"><span class="toc-num">08</span> 功能实现</a>
+    <a href="#s9" class="sidebar__nav-link"><span class="toc-num">09</span> 问题与方案</a>
+    <a href="#s10" class="sidebar__nav-link"><span class="toc-num">10</span> 使用说明</a>
+    <a href="#s11" class="sidebar__nav-link"><span class="toc-num">11</span> 网络访问&注意事项</a>
   </nav>
   <div class="sidebar__footer">v1.0.0 · 2026</div>
 </aside>
@@ -202,8 +212,8 @@
       <span class="topbar__breadcrumb">文档 / <span>设计说明</span></span>
     </div>
     <div class="topbar__right">
-      <a href="login.html" class="topbar__btn"><span>←</span> <span>返回看板</span></a>
-      <a href="部署说明.txt" class="topbar__btn topbar__btn--primary"><span>📄</span> <span>部署说明</span></a>
+      <a href="http://localhost:3000" class="topbar__btn" id="backBtn"><span>←</span> <span>返回看板</span></a>
+      <span class="topbar__status topbar__status--off" id="statusBadge"><span class="dot dot--off"></span> <span id="statusText">检测中…</span></span>
     </div>
   </header>
   <article class="content">
@@ -217,14 +227,14 @@
     <div class="doc-card">
       <div class="doc-card__title"><i>🎯</i> 核心数据</div>
       <table>
-        <tr><td style="width:140px;font-weight:500;">后端文件</td><td>6 个文件（server.js, database.js, init-data.js, migrate-equipment.js, package.json）</td></tr>
-        <tr><td style="font-weight:500;">前端页面</td><td>6 个 HTML（login, index, detail, alarms, personnel, settings）</td></tr>
+        <tr><td style="width:140px;font-weight:500;">后端文件</td><td>8 个文件（server.js, database.js, init-data.js, migrate-equipment.js, alarm-engine.js, sse.js, package.json）</td></tr>
+        <tr><td style="font-weight:500;">前端页面</td><td>9 个 HTML（login, index, display, detail, alarms, personnel, settings, templates, publish）</td></tr>
         <tr><td style="font-weight:500;">CSS 文件</td><td>4 个（base, layout, components, responsive）</td></tr>
-        <tr><td style="font-weight:500;">JS 文件</td><td>5 个（api, app, utils, charts, dashboard）</td></tr>
-        <tr><td style="font-weight:500;">API 总数</td><td>22 个 RESTful 端点</td></tr>
-        <tr><td style="font-weight:500;">数据库表</td><td>12 张</td></tr>
-        <tr><td style="font-weight:500;">模拟数据量</td><td>480 条记录（12 设备 + 50 告警 + 90 产量 + 200 温度 + 60 日志 + 30 维修 + ...）</td></tr>
-        <tr><td style="font-weight:500;">JS 导出函数</td><td>71 个（window 全局挂载）</td></tr>
+        <tr><td style="font-weight:500;">JS 文件</td><td>6 个（api, app, utils, charts, dashboard, realtime）</td></tr>
+        <tr><td style="font-weight:500;">API 总数</td><td>约 65 个 RESTful 端点 + SSE 实时流</td></tr>
+        <tr><td style="font-weight:500;">数据库表</td><td>19 张</td></tr>
+        <tr><td style="font-weight:500;">模拟数据量</td><td>约 500 条记录</td></tr>
+        <tr><td style="font-weight:500;">JS 导出函数</td><td>约 137 个（window 全局挂载）</td></tr>
         <tr><td style="font-weight:500;">SVG 图标</td><td>10 个</td></tr>
       </table>
     </div>
@@ -232,37 +242,42 @@
     <h2 id="s2"><span class="section-num">二</span> 项目结构</h2>
     <div class="file-tree">📁 device-dashboard/
 │
-├── 📁 <span class="highlight">backend</span>                        # 后端服务（6 文件）
+├── 📁 <span class="highlight">backend</span>                        # 后端服务（8 文件）
 │   ├── 📄 package.json                # express, sqlite3, cors
-│   ├── 📄 server.js                   # 22 个 API 路由 + 静态托管
-│   ├── 📄 database.js                 # 12 张表建表语句
-│   ├── 📄 init-data.js                # 模拟数据初始化（480 条记录）
+│   ├── 📄 server.js                   # 约 65 个 API 路由 + SSE 模拟器 + 静态托管
+│   ├── 📄 database.js                 # 19 张表建表语句
+│   ├── 📄 init-data.js                # 模拟数据初始化（约 500 条记录）
 │   ├── 📄 migrate-equipment.js        # 精确设备数据迁移脚本
+│   ├── 📄 alarm-engine.js             # 告警规则引擎（定时扫描自动生成告警）
+│   ├── 📄 sse.js                      # SSE 广播模块（客户端管理/心跳/事件推送）
 │   └── 📄 data.db                     # SQLite 数据库（自动生成）
 │
-├── 📁 <span class="highlight">frontend</span>                       # 前端应用（6 HTML + 4 CSS + 5 JS）
-│   ├── 📄 index.html                  # CoreUI 风格首页看板
-│   ├── 📄 login.html                  # 登录/注册页（4 角色动画）
+├── 📁 <span class="highlight">frontend</span>                       # 前端应用（9 HTML + 4 CSS + 5 JS）
+│   ├── 📄 index.html                  # 总览看板（KPI 卡片 + 图表 + 设备网格）
+│   ├── 📄 login.html                  # 登录/注册（4 角色动画，瞳孔跟随鼠标）
+│   ├── 📄 display.html                # 看板展示页（大屏终端渲染）
 │   ├── 📁 <span class="highlight">pages</span>
 │   │   ├── 📄 alarms.html             # 告警管理（筛选 + 分页 + 导出 CSV）
 │   │   ├── 📄 detail.html             # 设备详情（实时参数 + 温度趋势 + 维修历史）
 │   │   ├── 📄 personnel.html          # 人员管理（卡片 + 操作日志 + 绩效图）
-│   │   └── 📄 settings.html           # 系统设置（7 个配置模块）
+│   │   ├── 📄 settings.html           # 系统设置（7 个配置模块 + 用户管理）
+│   │   ├── 📄 templates.html          # 看板模板管理（创建/编辑模板）
+│   │   └── 📄 publish.html            # 发布管理（看板实例 + 展示终端）
 │   ├── 📁 <span class="highlight">css</span>
 │   │   ├── 📄 base.css                # CSS 变量 + 暗色/亮色主题 + Reset
 │   │   ├── 📄 layout.css              # 页面布局（侧边栏 + Grid）
 │   │   ├── 📄 components.css          # 组件样式（卡片 / 按钮 / 表格 / 徽章）
 │   │   └── 📄 responsive.css          # 三端响应式（PC / 平板 / 手机）
 │   ├── 📁 <span class="highlight">js</span>
-│   │   ├── 📄 utils.js                # 16 个工具函数（防抖 / 日期 / CSV导出）
-│   │   ├── 📄 api.js                  # 20 个 API 封装（fetch + 统一拦截）
+│   │   ├── 📄 utils.js                # 21 个工具函数（防抖 / 日期 / CSV导出 / 角色权限 / Toast）
+│   │   ├── 📄 api.js                  # 68 个 API 封装（fetch + 统一拦截）
 │   │   ├── 📄 charts.js               # ECharts 图表（产量 / OEE / 温度）
-│   │   ├── 📄 dashboard.js            # 首页逻辑（KPI / 设备卡片 / 搜索 / 自动刷新）
+│   │   ├── 📄 realtime.js             # SSE 客户端（EventSource/自动重连/事件分发）
+│   │   ├── 📄 dashboard.js            # 首页逻辑（KPI / 设备卡片 / 搜索 / 自动刷新 / SSE）
 │   │   └── 📄 app.js                  # 入口（侧边栏 / 主题 / 快捷键 / 登录守卫）
 │   └── 📁 assets/icons                # 10 个 SVG 图标
 │
 ├── 📄 设计说明文档.html               # 本文档（HTML 版）
-├── 📄 设计说明文档.txt                # 本文档（纯文本版）
 └── 📄 部署说明.txt                    # 部署手册
     </div>
 
@@ -270,6 +285,7 @@
     <h3>整体架构</h3>
     <p>前端（原生 HTML+CSS+JS + ECharts）<span style="color:var(--text-muted)">→</span> HTTP <span style="color:var(--text-muted)">→</span> 后端（Node.js + Express）<span style="color:var(--text-muted)">→</span> SQLite3</p>
     <p>采用<strong>单服务托管模式</strong>：Express 通过 <code>express.static</code> 统一托管前端静态文件，所有 API 统一返回格式 <code>{ code, data, message }</code>。前端不依赖构建工具，直接运行。</p>
+    <p><strong>多角色权限系统</strong>：看板管理员 / 车间主管 / 设备维修员 / 普通员工，基于请求头 <code>X-User-Id</code> 实现权限校验。</p>
 
     <h3>响应式策略</h3>
     <table>
@@ -282,7 +298,7 @@
     </table>
 
     <h3>UI 风格</h3>
-    <p>参考 <strong>CoreUI Admin 模板</strong>：侧边栏 <code>#1a1e2e</code> 深色背景，激活项紫色 <code>#6C3FF5</code> 左边框，卡片 8px 圆角 + 微阴影，Font Awesome 6 图标库。暗色/亮色双主题通过 CSS 变量实现切换。</p>
+    <p>参考 <strong>CoreUI Admin 模板</strong>：侧边栏 <code>#0d1117</code> 深色背景，激活项紫色 <code>#6C3FF5</code> 左边框，卡片 8px 圆角 + 微阴影，Font Awesome 6 图标库。暗色/亮色双主题通过 CSS 变量实现切换。</p>
 
     <h3>技术选型理由</h3>
     <ul>
@@ -293,27 +309,34 @@
     </ul>
 
     <h2 id="s4"><span class="section-num">四</span> 数据库设计</h2>
-    <p>共 12 张表：</p>
+    <p>共 19 张表：</p>
     <table>
       <thead><tr><th>#</th><th>表名</th><th>说明</th><th>关键字段</th></tr></thead>
       <tbody>
-        <tr><td>1</td><td><code>equipment</code></td><td>设备信息</td><td>name, code, type, status, oee, currentOutput, thresholds</td></tr>
+        <tr><td>1</td><td><code>equipment</code></td><td>设备信息</td><td>equipmentNo, name, type, status, oee, 4 params + 8 thresholds</td></tr>
         <tr><td>2</td><td><code>runtime</code></td><td>运行记录</td><td>equipment_id, status, duration, record_time</td></tr>
-        <tr><td>3</td><td><code>production</code></td><td>产量记录</td><td>equipment_id, output_count, reject_count, record_date</td></tr>
-        <tr><td>4</td><td><code>alarms</code></td><td>告警记录</td><td>equipment_id, level, title, message, status</td></tr>
+        <tr><td>3</td><td><code>production</code></td><td>产量记录</td><td>equipment_id, output_count, reject_count, cycle_time, record_date</td></tr>
+        <tr><td>4</td><td><code>alarms</code></td><td>告警记录</td><td>equipment_id, level, title, message, status, confirmed_at</td></tr>
         <tr><td>5</td><td><code>temperature</code></td><td>温度采集</td><td>equipment_id, temp_value, record_time</td></tr>
-        <tr><td>6</td><td><code>personnel</code></td><td>人员信息</td><td>name, employee_no, role, phone</td></tr>
-        <tr><td>7</td><td><code>operations</code></td><td>操作日志</td><td>equipment_id, operator_id, action, result</td></tr>
-        <tr><td>8</td><td><code>maintenance</code></td><td>维修记录</td><td>equipment_id, type, description, cost, start/end_time</td></tr>
-        <tr><td>9</td><td><code>users</code></td><td>用户认证</td><td>username, password, name, role, roleText</td></tr>
+        <tr><td>6</td><td><code>personnel</code></td><td>人员信息</td><td>name, employee_no, role, phone, email, status</td></tr>
+        <tr><td>7</td><td><code>operations</code></td><td>操作日志</td><td>equipment_id, operator_id, action, detail, result</td></tr>
+        <tr><td>8</td><td><code>maintenance</code></td><td>维修记录</td><td>equipment_id, type, description, fault_cause, parts_replaced, cost</td></tr>
+        <tr><td>9</td><td><code>users</code></td><td>用户认证</td><td>username, password, name, roles（逗号分隔多角色）</td></tr>
         <tr><td>10</td><td><code>staff</code></td><td>值班人员</td><td>name, position, shift, phone</td></tr>
         <tr><td>11</td><td><code>op_log</code></td><td>操作记录</td><td>time, person, action, device, result</td></tr>
         <tr><td>12</td><td><code>performance</code></td><td>绩效数据</td><td>name, month, output</td></tr>
+        <tr><td>13</td><td><code>data_sources</code></td><td>数据源配置</td><td>name, endpoint, api_key, headers, refresh_interval</td></tr>
+        <tr><td>14</td><td><code>alarm_rules</code></td><td>告警规则</td><td>equipment_id, param_name, min_value, max_value, notify_level</td></tr>
+        <tr><td>15</td><td><code>board_templates</code></td><td>看板模板</td><td>name, layout_type, config, status(draft/published)</td></tr>
+        <tr><td>16</td><td><code>component_library</code></td><td>组件库</td><td>name, type, icon, default_config</td></tr>
+        <tr><td>17</td><td><code>template_components</code></td><td>模板组件关联</td><td>template_id, component_id, position, config</td></tr>
+        <tr><td>18</td><td><code>board_instances</code></td><td>看板实例</td><td>template_id, name, status, display_config</td></tr>
+        <tr><td>19</td><td><code>display_terminals</code></td><td>展示终端</td><td>name, type, bound_instance_id, status</td></tr>
       </tbody>
     </table>
 
     <h2 id="s5"><span class="section-num">五</span> API 接口清单</h2>
-    <p>共 22 个 RESTful API：</p>
+    <p>共约 60 个 RESTful API 端点：</p>
 
     <div class="doc-card">
       <div class="doc-card__title"><i>🔐</i> 认证模块</div>
@@ -328,14 +351,15 @@
         <tr><td style="width:80px"><span class="method method--get">GET</span></td><td><code>/api/equipment</code></td><td>设备列表（status / type / keyword 筛选）</td></tr>
         <tr><td><span class="method method--get">GET</span></td><td><code>/api/equipment/:id</code></td><td>设备详情（含实时参数 + 维修历史）</td></tr>
         <tr><td><span class="method method--get">GET</span></td><td><code>/api/equipment/:id/temperature</code></td><td>设备温度历史（range: today/7d/30d）</td></tr>
-        <tr><td><span class="method method--get">GET</span></td><td><code>/api/equipment/:id/detail</code></td><td>设备完整聚合详情</td></tr>
-      </table>
+        <tr><td><span class="method method--post">POST</span></td><td><code>/api/equipment</code></td><td>新增设备（需管理员/主管权限）</td></tr>
+        <tr><td><span class="method method--delete">DEL</span></td><td><code>/api/equipment/:id</code></td><td>删除设备（级联删除关联数据）</td></tr>
+        <tr><td><span class="method method--get">GET</span></td><td><code>/api/equipment/:id/detail</code></td><td>设备完整聚合详情</td></tr>        <tr><td><span class="method method--get">GET</span></td><td><code>/api/equipment/next-no</code></td><td>获取下一个可用设备编号（自动生成 EQ-xxx）</td></tr>      </table>
     </div>
     <div class="doc-card">
       <div class="doc-card__title"><i>📊</i> 仪表盘模块</div>
       <table>
         <tr><td style="width:80px"><span class="method method--get">GET</span></td><td><code>/api/dashboard/stats</code></td><td>KPI 统计（8 个指标：total / running / idle / fault / offline / alarmCount / todayOutput / avgOee）</td></tr>
-        <tr><td><span class="method method--get">GET</span></td><td><code>/api/dashboard/oee</code></td><td>OEE 数据（整体 + 各设备）</td></tr>
+        <tr><td><span class="method method--get">GET</span></td><td><code>/api/dashboard/oee</code></td><td>OEE 数据（良品率×在线率，整体+各设备）</td></tr>
         <tr><td><span class="method method--get">GET</span></td><td><code>/api/production</code></td><td>产量数据（range / equipmentId 筛选）</td></tr>
         <tr><td><span class="method method--get">GET</span></td><td><code>/api/temperature</code></td><td>温度数据（range / equipmentId 筛选）</td></tr>
       </table>
@@ -348,18 +372,102 @@
         <tr><td><span class="method method--get">GET</span></td><td><code>/api/alarms/active</code></td><td>活跃告警列表（用于首页滚动条）</td></tr>
         <tr><td><span class="method method--patch">PATCH</span></td><td><code>/api/alarms/:id/confirm</code></td><td>确认告警（仅 active 可确认）</td></tr>
         <tr><td><span class="method method--patch">PATCH</span></td><td><code>/api/alarms/:id/clear</code></td><td>清除告警（仅 confirmed 可清除）</td></tr>
+        <tr><td><span class="method method--get">GET</span></td><td><code>/api/alarms/stats/by-device</code></td><td>按设备统计告警数量</td></tr>
+        <tr><td><span class="method method--get">GET</span></td><td><code>/api/alarms/stats/by-level</code></td><td>按告警级别统计数量</td></tr>
+        <tr><td><span class="method method--get">GET</span></td><td><code>/api/alarms/stats/by-time</code></td><td>按时间统计告警数量</td></tr>
       </table>
     </div>
     <div class="doc-card">
-      <div class="doc-card__title"><i>👤</i> 人员与其他模块</div>
+      <div class="doc-card__title"><i>👤</i> 人员管理模块（车间主管）</div>
       <table>
-        <tr><td style="width:80px"><span class="method method--get">GET</span></td><td><code>/api/users</code></td><td>用户列表（用于设置页面）</td></tr>
-        <tr><td><span class="method method--get">GET</span></td><td><code>/api/personnel</code></td><td>人员列表</td></tr>
-        <tr><td><span class="method method--get">GET</span></td><td><code>/api/staff</code></td><td>值班人员列表</td></tr>
+        <tr><td style="width:80px"><span class="method method--get">GET</span></td><td><code>/api/personnel</code></td><td>人员列表</td></tr>
+        <tr><td><span class="method method--post">POST</span></td><td><code>/api/personnel</code></td><td>新增人员</td></tr>
+        <tr><td><span class="method method--put">PUT</span></td><td><code>/api/personnel/:id</code></td><td>编辑人员</td></tr>
+        <tr><td><span class="method method--delete">DEL</span></td><td><code>/api/personnel/:id</code></td><td>删除人员</td></tr>
+      </table>
+    </div>
+    <div class="doc-card">
+      <div class="doc-card__title"><i>👥</i> 值班人员</div>
+      <table>
+        <tr><td style="width:80px"><span class="method method--get">GET</span></td><td><code>/api/staff</code></td><td>值班人员列表</td></tr>
+        <tr><td><span class="method method--post">POST</span></td><td><code>/api/staff</code></td><td>新增值班人员</td></tr>
+        <tr><td><span class="method method--delete">DEL</span></td><td><code>/api/staff/:id</code></td><td>删除值班人员</td></tr>
+      </table>
+    </div>
+    <div class="doc-card">
+      <div class="doc-card__title"><i>📋</i> 操作日志与维修</div>
+      <table>
+        <tr><td style="width:80px"><span class="method method--get">GET</span></td><td><code>/api/operations</code></td><td>操作日志（按设备筛选）</td></tr>
+        <tr><td><span class="method method--get">GET</span></td><td><code>/api/maintenance</code></td><td>维修记录（按设备/告警筛选）</td></tr>
+        <tr><td><span class="method method--post">POST</span></td><td><code>/api/maintenance/from-alarm</code></td><td>从告警创建维修记录</td></tr>
+        <tr><td><span class="method method--put">PUT</span></td><td><code>/api/maintenance/:id</code></td><td>更新维修记录</td></tr>
+      </table>
+    </div>
+    <div class="doc-card">
+      <div class="doc-card__title"><i>📊</i> 数据源管理（看板管理员）</div>
+      <table>
+        <tr><td style="width:80px"><span class="method method--get">GET</span></td><td><code>/api/data-sources</code></td><td>数据源列表</td></tr>
+        <tr><td><span class="method method--post">POST</span></td><td><code>/api/data-sources</code></td><td>新增数据源</td></tr>
+        <tr><td><span class="method method--put">PUT</span></td><td><code>/api/data-sources/:id</code></td><td>修改数据源</td></tr>
+        <tr><td><span class="method method--delete">DEL</span></td><td><code>/api/data-sources/:id</code></td><td>删除数据源</td></tr>
+        <tr><td><span class="method method--post">POST</span></td><td><code>/api/data-sources/:id/test</code></td><td>测试数据源连接</td></tr>
+      </table>
+    </div>
+    <div class="doc-card">
+      <div class="doc-card__title"><i>📐</i> 看板模板管理</div>
+      <table>
+        <tr><td style="width:80px"><span class="method method--get">GET</span></td><td><code>/api/board-templates</code></td><td>模板列表（含组件数）</td></tr>
+        <tr><td><span class="method method--post">POST</span></td><td><code>/api/board-templates</code></td><td>创建模板</td></tr>
+        <tr><td><span class="method method--get">GET</span></td><td><code>/api/board-templates/:id</code></td><td>模板详情（含组件）</td></tr>
+        <tr><td><span class="method method--put">PUT</span></td><td><code>/api/board-templates/:id</code></td><td>更新模板</td></tr>
+        <tr><td><span class="method method--delete">DEL</span></td><td><code>/api/board-templates/:id</code></td><td>删除模板</td></tr>
+      </table>
+    </div>
+
+    <div class="doc-card">
+      <div class="doc-card__title"><i>�</i> SSE 实时推送</div>
+      <table>
+        <tr><td style="width:80px"><span class="method method--get">GET</span></td><td><code>/api/sse/events</code></td><td>Server-Sent Events 实时数据流（EventSource）</td></tr>
+      </table>
+      <table>
+        <thead><tr><th>事件名</th><th>推送频率</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>device-param-update</code></td><td>每 6~9 秒</td><td>设备实时参数变化（温度/电流/电压/压力）</td></tr>
+          <tr><td><code>device-status-change</code></td><td>每 25~35 秒</td><td>设备运行状态变更</td></tr>
+          <tr><td><code>alarm</code></td><td>每 10 秒增量检测</td><td>新告警通知推送</td></tr>
+          <tr><td><code>kpi-update</code></td><td>每 15 秒</td><td>KPI 统计数据刷新</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="doc-card">
+      <div class="doc-card__title"><i>⭐</i> 收藏模块（仅普通员工）</div>
+      <table>
+        <tr><td style="width:80px"><span class="method method--get">GET</span></td><td><code>/api/favorites</code></td><td>获取收藏设备 ID 列表</td></tr>
+        <tr><td><span class="method method--post">POST</span></td><td><code>/api/favorites/toggle</code></td><td>切换设备收藏状态</td></tr>
+      </table>
+    </div>
+    <div class="doc-card">
+      <div class="doc-card__title"><i>�📊</i> 用户管理 &amp; 告警规则 &amp; 组件库 &amp; 看板实例 &amp; 展示终端</div>
+      <table>
+        <tr><td style="width:80px"><span class="method method--get">GET</span></td><td><code>/api/users</code></td><td>用户列表（含角色数组）</td></tr>
+        <tr><td><span class="method method--delete">DEL</span></td><td><code>/api/users/:id</code></td><td>删除用户（保护最后管理员）</td></tr>
+        <tr><td><span class="method method--post">POST</span></td><td><code>/api/users/change-password</code></td><td>修改密码</td></tr>
+        <tr><td><span class="method method--get">GET</span></td><td><code>/api/alarm-rules</code></td><td>告警规则列表（按设备筛选）</td></tr>
+        <tr><td><span class="method method--post">POST</span></td><td><code>/api/alarm-rules</code></td><td>新增告警规则</td></tr>
+        <tr><td><span class="method method--put">PUT</span></td><td><code>/api/alarm-rules/:id</code></td><td>修改告警规则</td></tr>
+        <tr><td><span class="method method--delete">DEL</span></td><td><code>/api/alarm-rules/:id</code></td><td>删除告警规则</td></tr>
+        <tr><td><span class="method method--get">GET</span></td><td><code>/api/component-library</code></td><td>组件库列表</td></tr>
+        <tr><td><span class="method method--get">GET</span></td><td><code>/api/board-instances</code></td><td>看板实例列表</td></tr>
+        <tr><td><span class="method method--post">POST</span></td><td><code>/api/board-instances</code></td><td>创建实例</td></tr>
+        <tr><td><span class="method method--put">PUT</span></td><td><code>/api/board-instances/:id</code></td><td>更新实例</td></tr>
+        <tr><td><span class="method method--delete">DEL</span></td><td><code>/api/board-instances/:id</code></td><td>删除实例</td></tr>
+        <tr><td><span class="method method--post">POST</span></td><td><code>/api/board-instances/:id/publish</code></td><td>发布/下架看板</td></tr>
+        <tr><td><span class="method method--get">GET</span></td><td><code>/api/display-terminals</code></td><td>终端列表</td></tr>
+        <tr><td><span class="method method--post">POST</span></td><td><code>/api/display-terminals</code></td><td>注册终端</td></tr>
+        <tr><td><span class="method method--put">PUT</span></td><td><code>/api/display-terminals/:id</code></td><td>更新终端</td></tr>
+        <tr><td><span class="method method--delete">DEL</span></td><td><code>/api/display-terminals/:id</code></td><td>删除终端</td></tr>
         <tr><td><span class="method method--get">GET</span></td><td><code>/api/op_log</code></td><td>操作记录（按人员筛选）</td></tr>
         <tr><td><span class="method method--get">GET</span></td><td><code>/api/performance</code></td><td>绩效排名（按产量降序）</td></tr>
-        <tr><td><span class="method method--get">GET</span></td><td><code>/api/operations</code></td><td>操作日志（按设备筛选）</td></tr>
-        <tr><td><span class="method method--get">GET</span></td><td><code>/api/maintenance</code></td><td>维修记录（按设备筛选）</td></tr>
       </table>
     </div>
 
@@ -374,15 +482,41 @@
         <tr><td>温度</td><td>200 条</td><td>多设备 7 天采集</td></tr>
         <tr><td>操作日志</td><td>60 条</td><td>近 14 天操作记录</td></tr>
         <tr><td>维修记录</td><td>30 条</td><td>近 60 天维修/巡检/升级</td></tr>
-        <tr><td>用户</td><td>3 个</td><td>admin / engineer / operator · 密码 123456</td></tr>
+        <tr><td>用户</td><td>4 个</td><td>admin / supervisor / maintainer / viewer · 密码 123456</td></tr>
         <tr><td>值班人员</td><td>8 名</td><td>含白班/夜班安排</td></tr>
         <tr><td>操作记录</td><td>12 条</td><td>用于首页操作记录表</td></tr>
         <tr><td>绩效数据</td><td>5 条</td><td>人员产量排名</td></tr>
-        <tr><td><strong>合计</strong></td><td><strong>480 条</strong></td><td>幂等初始化，数据已存在则跳过</td></tr>
+        <tr><td>数据源</td><td>3 个</td><td>天气/MES/能源示例</td></tr>
+        <tr><td>告警规则</td><td>10 条</td><td>设备参数阈值规则</td></tr>
+        <tr><td>组件库</td><td>5 个</td><td>预定义看板组件</td></tr>
+        <tr><td>看板模板</td><td>3 个</td><td>生产/设备/产量模板</td></tr>
+        <tr><td><strong>合计</strong></td><td><strong>约 500 条</strong></td><td>幂等初始化，数据已存在则跳过</td></tr>
       </tbody>
     </table>
 
-    <h2 id="s7"><span class="section-num">七</span> 功能实现说明</h2>
+    <h2 id="s7"><span class="section-num">七</span> 角色权限体系</h2>
+    <p>共 4 种角色，支持多角色组合（逗号分隔）：</p>
+    <table>
+      <thead><tr><th>角色标识</th><th>角色中文名</th><th>权限说明</th></tr></thead>
+      <tbody>
+        <tr><td><code>dashboard_admin</code></td><td>看板管理员</td><td>全部权限，含用户管理、数据源管理</td></tr>
+        <tr><td><code>workshop_supervisor</code></td><td>车间主管</td><td>人员管理、告警确认/清除、设置访问</td></tr>
+        <tr><td><code>maintenance_tech</code></td><td>设备维修员</td><td>维修记录创建/更新、告警查看</td></tr>
+        <tr><td><code>viewer</code></td><td>普通员工</td><td>仅可访问总览看板和设备详情</td></tr>
+      </tbody>
+    </table>
+    <p>默认账号（4 个，密码均为 <code>123456</code>）：</p>
+    <table>
+      <thead><tr><th>用户名</th><th>姓名</th><th>角色</th></tr></thead>
+      <tbody>
+        <tr><td><code>admin</code></td><td>系统管理员</td><td>dashboard_admin + workshop_supervisor</td></tr>
+        <tr><td><code>supervisor</code></td><td>张主管</td><td>workshop_supervisor</td></tr>
+        <tr><td><code>maintainer</code></td><td>王维修</td><td>maintenance_tech</td></tr>
+        <tr><td><code>viewer</code></td><td>李员工</td><td>viewer（只读模式）</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="s8"><span class="section-num">八</span> 功能实现说明</h2>
 
     <h3>1. 设备总览模块（index.html）</h3>
     <ul>
@@ -391,6 +525,8 @@
       <li><strong>设备卡片网格</strong>：4 列（PC）/ 2 列（平板）/ 1 列（手机），hover 紫色边框</li>
       <li>点击卡片跳转详情页（URL 带 <code>id</code> 参数）</li>
       <li>视图切换：卡片 ↔ 列表（localStorage 持久化）</li>
+      <li>设备类型下拉筛选 + KPI 卡片点击联动设备列表筛选</li>
+      <li>添加新设备弹窗 + 按角色权限显示/隐藏删除按钮</li>
     </ul>
 
     <h3>2. 数据可视化模块（ECharts）</h3>
@@ -409,6 +545,7 @@
       <li><strong>告警滚动条</strong>：首页顶部滚动显示活跃告警，悬停暂停</li>
       <li><strong>CSV 导出</strong>：带 BOM 的中文编码，从当前表格数据导出</li>
       <li><strong>紧急弹窗</strong>：新 critical 告警弹出，localStorage 去重</li>
+      <li><strong>告警级别映射</strong>：数据库 warning→前端 major, info→minor</li>
     </ul>
 
     <h3>4. 设备详情模块（detail.html）</h3>
@@ -420,9 +557,10 @@
 
     <h3>5. 人员管理模块（personnel.html）</h3>
     <ul>
-      <li>值班人员卡片网格：8 人，含职位徽章（管理员/工程师/操作员）</li>
+      <li>值班人员卡片网格（4 列）：8 人，含职位/班次/电话 + 职位徽章</li>
       <li>操作记录表格：按人员筛选</li>
       <li>绩效柱状图：ECharts 产量排名</li>
+      <li>新增/删除值班人员功能</li>
     </ul>
 
     <h3>6. 系统设置模块（settings.html）</h3>
@@ -432,31 +570,78 @@
       <li>默认时间范围：今日 / 7天 / 30天</li>
       <li>默认设备视图：卡片 / 列表</li>
       <li>告警通知：弹窗通知 + 声音提醒 Toggle</li>
-      <li>用户管理：只读表格（调用 GET /api/users）</li>
+      <li>用户管理：查看用户列表、添加用户、删除用户、修改密码</li>
       <li>保存/恢复默认按钮 + Toast 动画提示</li>
     </ul>
 
     <h3>7. 用户认证模块（login.html）</h3>
     <ul>
       <li>登录/注册同页 Tab 切换</li>
-      <li>登录守卫：未登录自动跳转到 <code>login.html</code></li>
+      <li>4 个动态角色（紫色/黑色/橙色/黄色），瞳孔跟随鼠标移动</li>
+      <li>眨眼动画、偷看密码按钮、角色倾斜、输入聚焦联动</li>
+      <li>注册支持多角色选择</li>
+      <li>登录守卫：自动跳转 + 角色权限受限页面拦截</li>
     </ul>
 
-    <h3>8. 已实现的功能扩展</h3>
+    <h3>8. 看板模板管理（templates.html）</h3>
+    <ul>
+      <li>模板卡片网格展示（名称/描述/布局类型/组件数/状态）</li>
+      <li>创建/编辑/删除模板 + 模板详情查看（含关联组件列表）</li>
+      <li>布局类型：单栏 / 双栏 / 三栏 / 混合</li>
+    </ul>
+
+    <h3>9. 发布管理（publish.html）</h3>
+    <ul>
+      <li>看板实例管理：创建/编辑/删除基于模板的看板实例</li>
+      <li>发布/下架看板实例（状态流转：draft↔published↔offline）</li>
+      <li>展示终端管理：注册/编辑/删除终端设备</li>
+      <li>终端类型：PC / 大屏 / 移动端，终端绑定看板实例</li>
+    </ul>
+
+    <h3>10. 看板展示页（display.html）</h3>
+    <ul>
+      <li>大屏展示模式，隐藏侧边栏和顶部栏</li>
+      <li>根据看板布局类型动态渲染网格</li>
+      <li>支持组件：数据卡片 / 实时表格 / 趋势图 / 告警列表 / 进度条</li>
+      <li>自动刷新（按实例配置间隔）+ 实时时钟显示</li>
+    </ul>
+
+    <h3>11. 告警规则引擎（alarm-engine.js）</h3>
+    <ul>
+      <li>定时扫描所有启用的告警规则（默认 30 秒间隔）</li>
+      <li>读取设备实时参数值与规则阈值比较，超限自动生成告警</li>
+      <li>避免重复告警（同设备同参数未清除前不再生成）</li>
+      <li>支持温度 / 电流 / 电压 / 压力 4 种参数类型</li>
+    </ul>
+
+    <h3>12. 已实现的功能扩展</h3>
     <div class="feature-list">
       <div class="feature-list__item"><span class="check">✅</span> 暗色/亮色主题切换</div>
       <div class="feature-list__item"><span class="check">✅</span> KPI 数字滚动动画（easeOutCubic）</div>
       <div class="feature-list__item"><span class="check">✅</span> 告警滚动条（悬停暂停）</div>
       <div class="feature-list__item"><span class="check">✅</span> 浏览器标签页闪烁（新告警提醒）</div>
-      <div class="feature-list__item"><span class="check">✅</span> 数据自动刷新（10s + visibilitychange）</div>
+      <div class="feature-list__item"><span class="check">✅</span> 数据自动刷新（可配置间隔 + visibilitychange）</div>
       <div class="feature-list__item"><span class="check">✅</span> 键盘快捷键（Ctrl+K / ESC / R）</div>
       <div class="feature-list__item"><span class="check">✅</span> 导出 CSV 报告（中文 BOM）</div>
       <div class="feature-list__item"><span class="check">✅</span> 全屏模式（Fullscreen API）</div>
       <div class="feature-list__item"><span class="check">✅</span> 底部 Tab 栏（手机端导航）</div>
       <div class="feature-list__item"><span class="check">✅</span> 侧边栏遮罩层（平板/手机端）</div>
+      <div class="feature-list__item"><span class="check">✅</span> 角色权限守卫（侧边栏隐藏 + 页面拦截）</div>
+      <div class="feature-list__item"><span class="check">✅</span> 加载进度条（6 步骤跟踪 + 10 秒兜底）</div>
+      <div class="feature-list__item"><span class="check">✅</span> 告警提示音（Web Audio API）</div>
+      <div class="feature-list__item"><span class="check">✅</span> 多角色用户注册（支持组合角色）</div>
+      <div class="feature-list__item"><span class="check">✅</span> 看板模板/实例/终端完整管理流程</div>
+      <div class="feature-list__item"><span class="check">✅</span> 告警规则引擎（自动检测参数超限）</div>
+      <div class="feature-list__item"><span class="check">✅</span> SSE 实时数据推送（设备参数/状态/告警/KPI 实时更新）</div>
+      <div class="feature-list__item"><span class="check">✅</span> 温度趋势图实时更新（SSE 追加数据点）</div>
+      <div class="feature-list__item"><span class="check">✅</span> 设备编号自动生成（EQ-xxx 递增）</div>
+      <div class="feature-list__item"><span class="check">✅</span> 添加设备弹窗自动填充编号</div>
+      <div class="feature-list__item"><span class="check">✅</span> 关注设备按钮角色权限控制（仅普通员工可见）</div>
+      <div class="feature-list__item"><span class="check">✅</span> 收藏 API 后端权限校验（requireRole viewer）</div>
+      <div class="feature-list__item"><span class="check">✅</span> 删除设备成功/失败判定修复</div>
     </div>
 
-    <h2 id="s8"><span class="section-num">八</span> 遇到的问题与解决方案</h2>
+    <h2 id="s9"><span class="section-num">九</span> 遇到的问题与解决方案</h2>
 
     <div class="issue-card">
       <div class="issue-card__q">🔴 问题 1：SQLite 异步建表与数据初始化竞态</div>
@@ -464,7 +649,7 @@
     </div>
     <div class="issue-card">
       <div class="issue-card__q">🔴 问题 2：前端 ES Module 与全局 Script 的兼容</div>
-      <div class="issue-card__a"><strong>解决方案：</strong>每个模块同时支持 <code>export</code> 和 <code>window.xxx</code> 全局导出，底部添加 <code>window.xxx = xxx</code> 兼容传统 script 标签。共导出 71 个全局函数。</div>
+      <div class="issue-card__a"><strong>解决方案：</strong>每个模块同时支持 <code>export</code> 和 <code>window.xxx</code> 全局导出，底部添加 <code>window.xxx = xxx</code> 兼容传统 script 标签。共导出约 60+ 个全局函数。</div>
     </div>
     <div class="issue-card">
       <div class="issue-card__q">🔴 问题 3：SQLite 外键约束导致确认告警操作失败</div>
@@ -482,8 +667,16 @@
       <div class="issue-card__q">🔴 问题 6：常量声明导致的服务器崩溃</div>
       <div class="issue-card__a"><strong>解决方案：</strong>后端 <code>const summarySql</code> 拼接 SQL 时因 <code>const</code> 限制抛出 TypeError，改为 <code>let</code> 修复。同时修复告警级别筛选映射（<code>major→warning, minor→info</code>）使前端筛选生效。</div>
     </div>
+    <div class="issue-card">
+      <div class="issue-card__q">🔴 问题 7：告警级别前后端命名不一致</div>
+      <div class="issue-card__a"><strong>解决方案：</strong>定义 <code>mapLevel() / unmapLevel()</code> 双向映射函数，数据库存储原始值（critical/warning/info），前端展示映射值（critical/major/minor）。</div>
+    </div>
+    <div class="issue-card">
+      <div class="issue-card__q">🔴 问题 8：大量新增 API 导致文档和代码不同步</div>
+      <div class="issue-card__a"><strong>解决方案：</strong>保持数据库建表、API 路由、前端页面三者同步新增，定期更新设计文档反映实际功能。</div>
+    </div>
 
-    <h2 id="s9"><span class="section-num">九</span> 使用说明</h2>
+    <h2 id="s10"><span class="section-num">十</span> 使用说明</h2>
 
     <div class="doc-card">
       <div class="doc-card__title"><i>🚀</i> 快速启动</div>
@@ -504,30 +697,81 @@
         <tr><td>设备详情</td><td><code>http://localhost:3000/pages/detail.html?id=1</code></td></tr>
         <tr><td>人员管理</td><td><code>http://localhost:3000/pages/personnel.html</code></td></tr>
         <tr><td>系统设置</td><td><code>http://localhost:3000/pages/settings.html</code></td></tr>
+        <tr><td>看板模板</td><td><code>http://localhost:3000/pages/templates.html</code></td></tr>
+        <tr><td>发布管理</td><td><code>http://localhost:3000/pages/publish.html</code></td></tr>
+        <tr><td>看板展示</td><td><code>http://localhost:3000/display.html?instance_id=1</code></td></tr>
       </tbody>
     </table>
 
     <table>
       <thead><tr><th>用户名</th><th>密码</th><th>角色</th></tr></thead>
       <tbody>
-        <tr><td><code>admin</code></td><td><code>123456</code></td><td>车间主管</td></tr>
-        <tr><td><code>engineer</code></td><td><code>123456</code></td><td>设备工程师</td></tr>
-        <tr><td><code>operator</code></td><td><code>123456</code></td><td>产线操作员</td></tr>
+        <tr><td><code>admin</code></td><td><code>123456</code></td><td>系统管理员</td></tr>
+        <tr><td><code>supervisor</code></td><td><code>123456</code></td><td>车间主管</td></tr>
+        <tr><td><code>maintainer</code></td><td><code>123456</code></td><td>设备维修员</td></tr>
+        <tr><td><code>viewer</code></td><td><code>123456</code></td><td>普通员工（只读）</td></tr>
       </tbody>
     </table>
 
-    <p>登录页默认填充 <code>admin</code> / <code>123456</code>，支持新用户注册（角色可选：admin / engineer / operator）主管账号有权注销自己账号，删除他人账号和添加他人账号。</p>
+    <p>登录页默认填充 <code>admin</code> / <code>123456</code>，支持新用户注册（多角色选择）。主管账号有权注销自己账号，删除他人账号和添加他人账号。</p>
 
-    <h2 id="s10"><span class="section-num">十</span> 总结与反思</h2>
-    <div class="doc-card" style="text-align:center;padding:40px;color:var(--text-muted);">
-      <p style="font-size:16px;margin-bottom:8px;">📝 请在此处撰写项目收获与改进方向</p>
-      <p style="font-size:14px;">建议涵盖：技术成长、团队协作、工程实践、未来改进等</p>
+    <h2 id="s11"><span class="section-num">十一</span> 网络访问说明&注意事项</h2>
+
+    <p>服务默认监听 <code>0.0.0.0:3000</code>（所有网络接口），因此不仅本机可访问，同局域网的其他设备也可访问。</p>
+
+    <table>
+      <thead><tr><th>访问方式</th><th>示例地址</th><th>是否可行</th></tr></thead>
+      <tbody>
+        <tr><td>本机访问</td><td><code>http://localhost:3000</code></td><td>✅</td></tr>
+        <tr><td>局域网访问</td><td><code>http://192.168.x.x:3000</code></td><td>✅ 需知道服务端局域网 IP</td></tr>
+        <tr><td>互联网访问</td><td>公网 IP 或域名</td><td>❌ 需额外配置</td></tr>
+      </tbody>
+    </table>
+
+    <div class="doc-card">
+      <div class="doc-card__title"><i>🌐</i> 局域网访问方法</div>
+      <ol>
+        <li>在服务端运行 <code>ipconfig</code>（Windows）或 <code>ifconfig</code>（Mac/Linux）查看本机局域网 IP</li>
+        <li>同一局域网的其他设备通过浏览器访问 <code>http://&lt;该IP&gt;:3000</code></li>
+      </ol>
+    </div>
+
+    <div class="doc-card">
+      <div class="doc-card__title"><i>☁️</i> 互联网访问（如需）</div>
+      <ul>
+        <li><strong>端口转发</strong>：在路由器中设置端口映射</li>
+        <li><strong>内网穿透</strong>：使用 frp、ngrok、Tailscale 等工具</li>
+        <li><strong>云服务器部署</strong>：将项目部署到有公网 IP 的云服务器上</li>
+        <li><strong>反向代理</strong>：通过 Nginx 配置域名和反向代理</li>
+      </ul>
+    </div>
+
+    <div class="doc-card doc-card--warn">
+      <div class="doc-card__title"><i>⚠️</i> 注意事项</div>
+      <ul>
+        <li>首次加载页面需要<strong>互联网连接</strong>（从 CDN 加载 ECharts 和 Font Awesome）</li>
+        <li>若需在完全离线的局域网中使用，请将这两个库改为本地引用</li>
+        <li>若在局域网中访问失败，请检查防火墙设置和端口占用情况</li>
+        <li>
+          <table>最低浏览器版本(为确保前后端服务正常运行)
+            <thead><tr><th>浏览器</th><th>最低版本</th><th>发布年份</th></tr></thead>
+            <tbody>
+                <tr><td>Google Chrome</td><td>≥ 57</td><td>2017年</td></tr>
+                <tr><td>Mozilla Firefox</td><td>≥ 52</td><td>2017年</td></tr>
+                <tr><td>Microsoft Edge</td><td>≥ 17（Chromium 版均可）</td><td>2018年</td></tr>
+                <tr><td>Apple Safari</td><td>≥ 10.1</td><td>2017年</td></tr>
+                <tr><td>Opera</td><td>≥ 44</td><td>2017年</td></tr>
+            </tbody>
+          </table>
+        </li>
+      </ul>
     </div>
 
   </article>
 </div>
 
 <script>
+  // 侧边栏菜单
   const sidebar = document.getElementById('sidebar');
   const menuBtn = document.getElementById('menuBtn');
   const overlay = document.getElementById('sidebarOverlay');
@@ -547,6 +791,63 @@
     });
   }, { rootMargin: '-40% 0px -55% 0px' });
   document.querySelectorAll('h2[id]').forEach(function(el) { observer.observe(el); });
+
+  // ========== 服务端状态检测 ==========
+  const statusBadge = document.getElementById('statusBadge');
+  const statusText = document.getElementById('statusText');
+  const statusDot = statusBadge ? statusBadge.querySelector('.dot') : null;
+  const backBtn = document.getElementById('backBtn');
+  let isRunning = false;
+
+  async function checkServerStatus() {
+    try {
+      const resp = await fetch('http://localhost:3000/api/dashboard/stats', { signal: AbortSignal.timeout(3000) });
+      return resp.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  function updateStatusUI(running) {
+    isRunning = running;
+    if (statusBadge) {
+      if (running) {
+        statusText.textContent = '服务端正在运行';
+        statusBadge.className = 'topbar__status topbar__status--on';
+        if (statusDot) { statusDot.className = 'dot dot--on'; }
+      } else {
+        statusText.textContent = '服务端已关闭';
+        statusBadge.className = 'topbar__status topbar__status--off';
+        if (statusDot) { statusDot.className = 'dot dot--off'; }
+      }
+    }
+    // 返回看板按钮联动
+    if (backBtn) {
+      if (running) {
+        backBtn.classList.remove('topbar__btn--disabled');
+        backBtn.title = '前往看板首页';
+        backBtn.href = 'http://localhost:3000';
+      } else {
+        backBtn.classList.add('topbar__btn--disabled');
+        backBtn.title = '服务端未运行，无法访问看板';
+        backBtn.removeAttribute('href');
+      }
+    }
+  }
+
+  // 页面加载时检测一次
+  if (statusBadge) {
+    (async function init() {
+      const running = await checkServerStatus();
+      updateStatusUI(running);
+    })();
+
+    // 每 10 秒自动刷新状态
+    setInterval(async function() {
+      const running = await checkServerStatus();
+      if (running !== isRunning) updateStatusUI(running);
+    }, 10000);
+  }
 </script>
 </body>
 </html>

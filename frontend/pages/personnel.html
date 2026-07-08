@@ -1,4 +1,11 @@
 <!DOCTYPE html>
+<!-- ============================================================
+     页面：人员管理页 (personnel.html)
+     用途：管理车间值班人员信息，展示当前值班人员卡片、
+           操作记录日志、本月产量绩效排行图表，
+           支持新增/删除值班人员。
+     所属项目：智能工厂设备监控看板
+     ============================================================ -->
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
@@ -10,8 +17,8 @@
   <link rel="stylesheet" href="../css/components.css">
   <link rel="stylesheet" href="../css/responsive.css">
   <style>
-    /* 仅 personnel 专属样式 */
-    .staff-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px; }
+    /* ===== 人员管理页专属样式 ===== */
+    .staff-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px; }  /* 值班人员卡片网格 */
     .staff-card {
       background:var(--bg-card); border:1px solid var(--border-color);
       border-radius:var(--radius-md); padding:16px 18px;
@@ -36,6 +43,8 @@
     .section-title i { color:var(--brand-purple,#6C3FF5); }
     @media (max-width:1023px){ .staff-grid{grid-template-columns:repeat(2,1fr)} }
     @media (max-width:767px){ .staff-grid{grid-template-columns:1fr} }
+    @media (max-width:767px){ .user-info-desktop{display:none!important} }
+    @media (min-width:768px){ .user-info-desktop{display:block!important} }
     #perfChart { width:100%; height:320px; }
   </style>
 </head>
@@ -69,7 +78,10 @@
     window.__loaderMarkApiReady=function(){steps.api=true;setP(80,'数据加载完成');check();};
     setTimeout(function(){if(L&&!L.classList.contains('hide')){setP(100,'加载完成');setTimeout(function(){L.classList.add('hide')},400);}},10000);})();
   </script>
-  <!-- 侧边栏（与 index.html 完全一致） -->
+  <!-- ============================================================
+       侧边栏导航 - 页面顶部左侧固定导航栏，包含应用 Logo、
+       功能模块菜单（总览/设备/告警/人员/设置）及主题切换按钮。
+       ============================================================ -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <img src="../assets/icons/logo.svg" alt="Logo" class="sidebar-logo">
@@ -96,6 +108,14 @@
         <img src="../assets/icons/user.svg" class="nav-icon">
         <span class="nav-text">人员管理</span>
       </a>
+      <a href="templates.html" class="nav-item" data-page="templates">
+        <img src="../assets/icons/template.svg" class="nav-icon">
+        <span class="nav-text">看板模板</span>
+      </a>
+      <a href="publish.html" class="nav-item" data-page="publish">
+        <img src="../assets/icons/publish.svg" class="nav-icon">
+        <span class="nav-text">发布管理</span>
+      </a>
       <a href="settings.html" class="nav-item" data-page="settings">
         <img src="../assets/icons/settings.svg" class="nav-icon">
         <span class="nav-text">系统设置</span>
@@ -110,7 +130,9 @@
   </aside>
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-  <!-- 主内容区（与 index.html 完全一致） -->
+  <!-- ============================================================
+       主内容区 - 包含顶部导航栏 (topbar) 和人员管理内容区域。
+       ============================================================ -->
   <div class="main" id="mainContent">
     <header class="topbar">
       <div class="topbar__left">
@@ -121,20 +143,35 @@
         <span class="topbar__clock" id="clock">--:--:--</span>
         <button class="topbar__icon-btn" id="topThemeBtn" title="切换主题"><i class="fas fa-moon"></i></button>
         <button class="topbar__icon-btn" id="refreshBtn" title="刷新数据"><i class="fas fa-sync-alt"></i></button>
+        <div class="topbar__user" id="userAvatar" title="用户信息" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--brand-purple,#6C3FF5);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0;">A</div>
+          <div style="text-align:left;line-height:1.3;display:none;" class="user-info-desktop">
+            <div id="userNameDisplay" style="font-size:13px;font-weight:600;color:var(--text-primary);">用户</div>
+            <div id="userRoleDisplay" style="font-size:11px;color:var(--text-muted);">普通员工</div>
+          </div>
+        </div>
       </div>
     </header>
 
     <div class="content">
-      <!-- 页面标题 -->
+      <!-- ===== 页面标题：人员管理 ===== -->
       <div class="page-header">
         <h1 class="page-header__title"><i class="fas fa-users" style="color:#6C3FF5;"></i> 人员管理</h1>
       </div>
 
-      <!-- 区域一：值班人员 -->
-      <div class="section-title"><i class="fas fa-id-card"></i> 当前值班人员</div>
+      <!-- ============================================================
+           区域一：当前值班人员卡片网格 + 新增人员按钮
+           ============================================================ -->
+      <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;">
+        <span><i class="fas fa-id-card"></i> 当前值班人员</span>
+        <button id="addStaffBtn" style="font-size:12px;padding:6px 14px;background:var(--brand-purple,#6C3FF5);color:#fff;border:none;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:4px;" data-role-required="workshop_supervisor,dashboard_admin"><i class="fas fa-plus"></i> 新增人员</button>
+      </div>
       <div class="staff-grid" id="staffGrid"></div>
 
-      <!-- 区域二：操作记录 -->
+      <!-- ============================================================
+           区域二：操作记录表格 - 按人员筛选，展示操作时间、人员、
+           操作内容、设备及结果
+           ============================================================ -->
       <div class="section-title" style="margin-top:20px;"><i class="fas fa-clipboard-list"></i> 操作记录</div>
       <div class="filter-bar2">
         <span>按人员筛选：</span>
@@ -149,7 +186,9 @@
         </div>
       </div>
 
-      <!-- 区域三：绩效图表 -->
+      <!-- ============================================================
+           区域三：本月产量排行柱状图（ECharts）
+           ============================================================ -->
       <div class="section-title"><i class="fas fa-chart-bar"></i> 本月产量排行</div>
       <div class="chart-card" style="margin-bottom:20px;">
         <div id="perfChart" class="chart-container"></div>
@@ -157,7 +196,39 @@
     </div>
   </div>
 
-  <!-- 手机端底部Tab栏 -->
+  <!-- ============================================================
+       新增人员弹窗 (Modal)：填写姓名、岗位、班次、联系电话
+       等基本信息后提交添加值班人员。
+       ============================================================ -->
+  <div id="addStaffModal" style="display:none;position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;" onclick="if(event.target===this)closeAddStaff()">
+    <div style="background:var(--bg-card,#141b2d);border:1px solid var(--border-color,#1e293b);border-radius:12px;padding:28px;width:90%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,0.4);" onclick="event.stopPropagation()">
+      <h3 style="margin:0 0 20px;font-size:18px;display:flex;align-items:center;gap:8px;"><i class="fas fa-user-plus" style="color:#6C3FF5;"></i> 新增值班人员</h3>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <input id="sf_name" placeholder="姓名" style="padding:10px 14px;background:var(--bg-secondary,#0f172a);border:1px solid var(--border-color,#1e293b);border-radius:8px;color:var(--text-primary,#e8edf5);font-size:14px;outline:none;">
+        <select id="sf_position" style="padding:10px 14px;background:var(--bg-secondary,#0f172a);border:1px solid var(--border-color,#1e293b);border-radius:8px;color:var(--text-primary,#e8edf5);font-size:14px;outline:none;">
+          <option value="">-- 请选择岗位 --</option>
+          <option value="车间主管">车间主管</option>
+          <option value="设备工程师">设备工程师</option>
+          <option value="操作员">操作员</option>
+        </select>
+        <select id="sf_shift" style="padding:10px 14px;background:var(--bg-secondary,#0f172a);border:1px solid var(--border-color,#1e293b);border-radius:8px;color:var(--text-primary,#e8edf5);font-size:14px;outline:none;">
+          <option value="">-- 请选择班次 --</option>
+          <option value="白班 08:00-20:00">白班 08:00-20:00</option>
+          <option value="夜班 20:00-08:00">夜班 20:00-08:00</option>
+        </select>
+        <input id="sf_phone" placeholder="联系电话" style="padding:10px 14px;background:var(--bg-secondary,#0f172a);border:1px solid var(--border-color,#1e293b);border-radius:8px;color:var(--text-primary,#e8edf5);font-size:14px;outline:none;">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:20px;">
+        <button onclick="closeAddStaff()" style="flex:1;padding:10px;border:1px solid var(--border-color,#1e293b);border-radius:8px;background:transparent;color:var(--text-secondary,#8899bb);cursor:pointer;font-size:14px;">取消</button>
+        <button id="confirmAddStaff" onclick="submitAddStaff()" style="flex:1;padding:10px;border:none;border-radius:8px;background:#6C3FF5;color:#fff;cursor:pointer;font-size:14px;font-weight:600;">确认添加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       手机端底部 Tab 导航栏：移动设备上替代侧边栏，
+       提供总览/设备/告警/人员四个页面的快速切换。
+       ============================================================ -->
   <nav class="bottom-tab-bar">
     <a href="../index.html" class="tab-item"><span class="tab-icon">📊</span><span>总览</span></a>
     <a href="detail.html" class="tab-item"><span class="tab-icon">⚙️</span><span>设备</span></a>
@@ -165,19 +236,74 @@
     <a href="personnel.html" class="tab-item active"><span class="tab-icon">👤</span><span>人员</span></a>
   </nav>
 
-  <!-- JavaScript -->
+  <!-- ============================================================
+       页面级 JavaScript
+       引入 ECharts 图表库和公共模块后，在此定义人员管理页
+       特有的数据加载与渲染逻辑。
+       ============================================================ -->
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
   <script src="../js/utils.js"></script>
   <script src="../js/api.js"></script>
   <script src="../js/app.js"></script>
   <script>
+    // ============================================================
+    // 岗位 CSS 映射：将中文岗位名映射到卡片徽章的样式类
+    // ============================================================
     var posMap={'车间主管':'admin','设备工程师':'engineer','操作员':'operator'};
+    // ============================================================
+    // 加载并渲染值班人员卡片网格
+    // ============================================================
     function loadStaff(){
+      var canManage = hasRole('workshop_supervisor') || hasRole('dashboard_admin');
       getStaff().then(function(s){
         var c=document.getElementById('staffGrid');if(!c||!s)return;
-        c.innerHTML=s.map(function(x){var cls=posMap[x.position]||'operator';return '<div class="staff-card"><div class="staff-card__name">'+x.name+'</div><span class="staff-card__badge '+cls+'">'+x.position+'</span><div class="staff-card__info"><i class="fas fa-clock"></i> '+(x.shift||'--')+'<br><i class="fas fa-phone"></i> '+(x.phone||'--')+'</div></div>';}).join('');
+        c.innerHTML=s.map(function(x){var cls=posMap[x.position]||'operator';return '<div class="staff-card"><div class="staff-card__name">'+x.name+'</div><span class="staff-card__badge '+cls+'">'+x.position+'</span><div class="staff-card__info"><i class="fas fa-clock"></i> '+(x.shift||'--')+'<br><i class="fas fa-phone"></i> '+(x.phone||'--')+'</div>'+(canManage?'<button onclick="deleteStaffMember('+x.id+')" title="删除" style="margin-top:8px;padding:4px 10px;border:1px solid var(--color-danger,#f44336);border-radius:6px;background:transparent;color:var(--color-danger,#f44336);font-size:11px;cursor:pointer;"><i class="fas fa-trash"></i> 删除</button>':'')+'</div>';}).join('');
       }).catch(function(e){console.error(e);});
     }
+    // ============================================================
+    // 重新加载人员卡片并更新操作记录筛选下拉框
+    // ============================================================
+    function reloadStaffAndFilter(){
+      loadStaff();
+      getStaff().then(function(list){
+        var f=document.getElementById('opFilter');
+        if(!f)return;
+        var cur=f.value;
+        f.innerHTML='<option value="all">全部人员</option>';
+        if(list&&list.length)list.forEach(function(x){var o=document.createElement('option');o.value=x.name;o.textContent=x.name;if(x.name===cur)o.selected=true;f.appendChild(o);});
+      }).catch(function(){});
+    }
+    // ============================================================
+    // 打开/关闭新增人员弹窗，关闭时重置表单字段
+    // ============================================================
+    function openAddStaff(){document.getElementById('addStaffModal').style.display='flex';document.getElementById('sf_name').focus();}
+    function closeAddStaff(){document.getElementById('addStaffModal').style.display='none';document.getElementById('sf_name').value='';document.getElementById('sf_position').value='';document.getElementById('sf_shift').value='';document.getElementById('sf_phone').value='';}
+    // ============================================================
+    // 提交新增人员表单：校验必填项 -> 调用 API -> 成功后刷新列表
+    // ============================================================
+    function submitAddStaff(){
+      var name=document.getElementById('sf_name').value.trim(),position=document.getElementById('sf_position').value,shift=document.getElementById('sf_shift').value,phone=document.getElementById('sf_phone').value.trim();
+      if(!name){alert('请输入姓名');return;}if(!position){alert('请选择岗位');return;}
+      var btn=document.getElementById('confirmAddStaff');btn.textContent='添加中...';btn.disabled=true;
+      addStaff({name:name,position:position,shift:shift,phone:phone}).then(function(r){
+        if(r&&r.success!==false){closeAddStaff();reloadStaffAndFilter();showToast&&showToast('✅ 人员 "'+name+'" 添加成功');}
+        else{alert('添加失败：'+(r&&r.message||'未知错误'));}
+      }).catch(function(e){alert('添加失败：'+e.message);}).finally(function(){btn.textContent='确认添加';btn.disabled=false;});
+    }
+    // ============================================================
+    // 删除指定值班人员（带确认提示）
+    // ============================================================
+    function deleteStaffMember(id){
+      if(!confirm('确定要删除该人员吗？'))return;
+      deleteStaff(id).then(function(r){
+        if(r&&r.success!==false){reloadStaffAndFilter();showToast&&showToast('✅ 人员已删除');}
+        else{alert('删除失败：'+(r&&r.message||'未知错误'));}
+      }).catch(function(e){alert('删除失败：'+e.message);});
+    }
+    // ============================================================
+    // 加载操作记录日志（可按人员筛选）
+    // 参数 p: 人员姓名，'all' 表示显示全部
+    // ============================================================
     function loadOpLog(p){
       getOpLog(p&&p!=='all'?{person:p}:{}).then(function(r){
         var t=document.getElementById('opLogBody');if(!t)return;
@@ -185,6 +311,10 @@
         t.innerHTML=r.map(function(x){var d=x.result==='异常'||x.result==='失败'?' style="color:var(--color-danger);"':'';return '<tr><td>'+x.time+'</td><td>'+x.person+'</td><td>'+x.action+'</td><td>'+x.device+'</td><td'+d+'>'+x.result+'</td></tr>';}).join('');
       }).catch(function(e){console.error(e);});
     }
+    // ============================================================
+    // 加载并渲染本月产量排行柱状图（使用 ECharts）
+    // 添加 200ms 延迟确保 DOM 容器渲染完成
+    // ============================================================
     function loadPerf(){
       getPerformance().then(function(d){
         var dom=document.getElementById('perfChart');
@@ -204,6 +334,10 @@
         }, 200);
       }).catch(function(e){console.error('加载绩效数据失败:',e);});
     }
+    // ============================================================
+    // DOM 初始化：加载值班人员、操作记录、绩效图表，
+    // 绑定新增人员和筛选事件，最后标记 API 数据就绪。
+    // ============================================================
     document.addEventListener('DOMContentLoaded',function(){
       Promise.all([
         new Promise(function(r){loadStaff();setTimeout(r,200);}),
@@ -215,8 +349,17 @@
       setTimeout(function() {
         loadPerf();
       }, 300);
-      var f=document.getElementById('opFilter');
-      if(f){['张伟','李娜','王强','刘洋','陈敏','杨磊','赵静','黄海'].forEach(function(n){var o=document.createElement('option');o.value=n;o.textContent=n;f.appendChild(o);});f.addEventListener('change',function(){loadOpLog(this.value);});}
+      // 动态加载人员下拉选项
+      reloadStaffAndFilter();
+      // 根据角色隐藏/显示需要权限的元素
+      var addBtn=document.getElementById('addStaffBtn');
+      if(addBtn){
+        var rolesRequired=(addBtn.dataset.roleRequired||'').split(',');
+        var hasAccess=rolesRequired.some(function(r){return hasRole(r);});
+        if(!hasAccess) addBtn.style.display='none';
+        else addBtn.addEventListener('click',openAddStaff);
+      }
+      document.getElementById('opFilter').addEventListener('change',function(){loadOpLog(this.value);});
     });
   </script>
 </body>

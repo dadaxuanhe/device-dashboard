@@ -1,12 +1,9 @@
 /**
- * ============================================================
  * charts.js - ECharts 图表配置与渲染
- * 功能：产量折线图、OEE 环形图、温度曲线图
- * 依赖：ECharts CDN（window.echarts）、api.js（window.getProduction/等）
- * ============================================================
+ * 产量折线图、OEE 环形图、温度曲线图
+ * 依赖：ECharts CDN（window.echarts）
  */
 
-// ECharts 通过 CDN script 标签加载，使用全局变量
 const echarts = window.echarts;
 
 // ============================================================
@@ -18,7 +15,7 @@ let temperatureChart = null;
 let currentRange = '7d';
 
 // ============================================================
-// 1. 产量折线图
+// 产量折线图
 // ============================================================
 function renderProductionChart(data, range) {
   var dom = document.getElementById('productionChart');
@@ -35,13 +32,13 @@ function renderProductionChart(data, range) {
   startDate.setDate(startDate.getDate() - daysBack);
   var endDate = new Date(today);
 
-  // 构建日期到数据的映射
+  // 构建日期到数据的映射，便于按日期快速查找
   var map = {};
   if (data && data.length > 0) {
     data.forEach(function(d) { map[d.date] = d; });
   }
 
-  // 生成完整的日期序列
+  // 生成完整的日期序列，缺失的日期用零值补全，保证 X 轴连续不间断
   var filled = [];
   var cur = new Date(startDate);
   while (cur <= endDate) {
@@ -54,11 +51,13 @@ function renderProductionChart(data, range) {
   var option = {
     tooltip: {
       trigger: 'axis',
+      // 自定义提示框位置：水平居中，显示在图表上方
       position: function(point, params, dom, rect, size) {
         var x = point[0] - size.contentSize[0] / 2;
         x = Math.max(4, Math.min(x, size.viewSize[0] - size.contentSize[0] - 4));
         return [x, -size.contentSize[1] - 8];
       },
+      // 自定义提示框内容：显示每条线的名称和数值
       formatter: function(params) {
         var html = '<strong>' + params[0].axisValue + '</strong><br/>';
         params.forEach(function(p) {
@@ -76,6 +75,7 @@ function renderProductionChart(data, range) {
     grid: { left: 50, right: 20, top: 40, bottom: 30 },
     xAxis: {
       type: 'category',
+      // 日期作为 X 轴类别
       data: data.map(function(d) { return d.date; }),
       axisLine: { lineStyle: { color: '#2a3a5c' } },
       axisLabel: { color: '#8899bb', fontSize: 11 }
@@ -132,7 +132,7 @@ function renderProductionChart(data, range) {
 }
 
 // ============================================================
-// 2. OEE 环形图（外层整体 + 内层各设备分布）
+// OEE 环形图（外层整体 + 内层各设备分布）
 // ============================================================
 function renderOeeChart(oeeData) {
   var dom = document.getElementById('oeeChart');
@@ -143,6 +143,7 @@ function renderOeeChart(oeeData) {
   var overall = oeeData.overall;
   var devices = oeeData.devices;
 
+  // OEE 值颜色：≥85绿 ≥70黄 ≥60橙 <60红
   function getColor(value) {
     if (value >= 85) return '#00e676';
     if (value >= 70) return '#ffd740';
@@ -165,6 +166,7 @@ function renderOeeChart(oeeData) {
         label: { show: false },
         emphasis: { scale: false },
         data: [
+          // 外层环形：显示整体 OEE 值，剩余部分填充背景色
           { value: overall, name: '整体OEE', itemStyle: { color: getColor(overall) } },
           { value: Math.max(100 - overall, 0), name: '剩余', itemStyle: { color: '#1a2335' } }
         ],
@@ -185,6 +187,7 @@ function renderOeeChart(oeeData) {
         },
         labelLine: { length: 8, length2: 8, lineStyle: { color: '#2a3a5c' } },
         emphasis: { scale: true },
+        // 内层环形：每个设备作为一个扇区，按 OEE 值着色
         data: devices.map(function(d) {
           return { name: d.name, value: d.oee, itemStyle: { color: getColor(d.oee) } };
         }),
@@ -192,6 +195,7 @@ function renderOeeChart(oeeData) {
         animationEasing: 'bounceOut'
       }
     ],
+    // 环形图中心文字：上方大号显示 OEE 百分比，下方小号显示标签
     graphic: [
       { type: 'text', left: 'center', top: '40%', style: { text: overall + '%', fill: '#e8edf5', fontSize: 28, fontWeight: 'bold' }, z: 100 },
       { type: 'text', left: 'center', top: '55%', style: { text: '整体OEE', fill: '#8899bb', fontSize: 12 }, z: 100 }
@@ -203,7 +207,7 @@ function renderOeeChart(oeeData) {
 }
 
 // ============================================================
-// 3. 温度曲线图
+// 温度曲线图
 // ============================================================
 function renderTemperatureChart(data) {
   var dom = document.getElementById('temperatureChart');
@@ -211,14 +215,16 @@ function renderTemperatureChart(data) {
 
   if (!temperatureChart) temperatureChart = echarts.init(dom, 'dark');
 
-  // 提取设备名称（去重）
+  // 提取所有不重复的设备名称，用于图例和系列数据
   var deviceNames = [];
   data.forEach(function(d) {
     if (deviceNames.indexOf(d.equipmentName) === -1) deviceNames.push(d.equipmentName);
   });
 
+  // 为每个设备分配不同的线条颜色
   var colors = ['#00bcd4', '#3d5afe', '#7c4dff', '#00e676', '#ff9100'];
 
+  // 按设备分组构建折线图系列
   var series = deviceNames.map(function(device, index) {
     var deviceData = data.filter(function(d) { return d.equipmentName === device; });
     return {
@@ -232,7 +238,7 @@ function renderTemperatureChart(data) {
     };
   });
 
-  // 用第一个设备的时间作为 X 轴
+  // 取第一个设备的时间戳作为 X 轴标签
   var firstDeviceData = data.filter(function(d) { return d.equipmentName === deviceNames[0]; });
   var timeLabels = firstDeviceData.map(function(d) {
     var parts = d.timestamp.split(' ');
@@ -242,11 +248,13 @@ function renderTemperatureChart(data) {
   var option = {
     tooltip: {
       trigger: 'axis',
+      // 自定义提示框位置：水平居中于鼠标，显示在图表上方
       position: function(point, params, dom, rect, size) {
         var x = point[0] - size.contentSize[0] / 2;
         x = Math.max(4, Math.min(x, size.viewSize[0] - size.contentSize[0] - 4));
         return [x, -size.contentSize[1] - 8];
       },
+      // 自定义提示内容：显示温度值及该设备的上下限阈值
       formatter: function(params) {
         var html = '<strong>' + params[0].axisValue + '</strong><br/>';
         params.forEach(function(p) {
@@ -292,7 +300,7 @@ function renderTemperatureChart(data) {
 }
 
 // ============================================================
-// 4. 图表窗口自适应
+// 窗口自适应
 // ============================================================
 function resizeCharts() {
   if (productionChart) productionChart.resize();
@@ -303,7 +311,7 @@ function resizeCharts() {
 window.addEventListener('resize', resizeCharts);
 
 // ============================================================
-// 5. 加载所有图表（按时间范围）
+// 加载所有图表（按时间范围）
 // ============================================================
 async function loadAllCharts(range) {
   range = range || '7d';
@@ -314,6 +322,7 @@ async function loadAllCharts(range) {
       window.getOEE ? window.getOEE() : Promise.reject('getOEE not available')
     ]);
 
+    // 分别渲染产量折线图、温度曲线图和 OEE 环形图
     renderProductionChart(results[0], range);
     renderTemperatureChart(results[1]);
     renderOeeChart(results[2]);

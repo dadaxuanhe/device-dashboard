@@ -2,19 +2,9 @@
  * database.js - 数据库连接与建表模块
  *
  * 职责：
- * 1. 连接 SQLite 数据库（文件存储）
- * 2. 创建 8 张业务表（若不存在）
- * 3. 导出 getDb() 和 closeDb() 供其他模块使用
- *
- * 数据表清单：
- * - equipment:    设备基本信息表
- * - runtime:      设备运行记录表
- * - production:   产量记录表
- * - alarms:       告警记录表
- * - temperature:  温度采集记录表
- * - personnel:    人员信息表
- * - operations:   操作日志表
- * - maintenance:  维修记录表
+ * - 连接 SQLite 数据库（WAL 模式）
+ * - 创建 19 张业务表（若不存在）
+ * - 导出 getDb() / waitForDb() / closeDb() 供其他模块使用
  */
 
 const sqlite3 = require('sqlite3').verbose();
@@ -23,7 +13,7 @@ const path = require('path');
 const DB_PATH = path.join(__dirname, 'data.db');
 
 let db = null;
-let dbReady = null; // Promise for database initialization
+let dbReady = null;
 
 /**
  * 获取数据库实例（单例），若未初始化则自动初始化
@@ -40,10 +30,12 @@ function getDb() {
     console.log('✅ 数据库连接成功:', DB_PATH);
   });
 
-  // 建表初始化立即开始（异步流水线）
+  // 使用 db.serialize() 确保 PRAGMA 设置和建表顺序执行
   dbReady = new Promise((resolve) => {
     db.serialize(() => {
+      // 启用 WAL 模式提升并发读写性能
       db.run('PRAGMA journal_mode=WAL;');
+      // 启用外键约束，确保关联数据的完整性
       db.run('PRAGMA foreign_keys=ON;');
       createTables();
       resolve();
@@ -69,7 +61,7 @@ function waitForDb() {
  */
 function createTables() {
   const stmts = [
-    // 1. 设备信息表
+    // 1. 设备信息表（含实时参数、阈值、OEE、产量）
     `CREATE TABLE IF NOT EXISTS equipment (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       equipmentNo TEXT UNIQUE NOT NULL,       -- 设备编号
@@ -94,6 +86,7 @@ function createTables() {
       voltageMax REAL DEFAULT 420,           -- 电压上限
       pressureMin REAL DEFAULT 0.4,          -- 压力下限
       pressureMax REAL DEFAULT 0.8,          -- 压力上限
+      maintenance_cycle INTEGER DEFAULT 90,  -- 维护周期（天）
       description TEXT,                       -- 设备描述/备注
       created_at TEXT DEFAULT (datetime('now','localtime')),
       updated_at TEXT DEFAULT (datetime('now','localtime'))
@@ -173,30 +166,34 @@ function createTables() {
       FOREIGN KEY (operator_id) REFERENCES personnel(id)
     )`,
 
-    // 8. 维修记录表
+    // 8. 维修记录表（含扩展的维修过程字段）
     `CREATE TABLE IF NOT EXISTS maintenance (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       equipment_id INTEGER NOT NULL,          -- 关联设备ID
       technician_id INTEGER NOT NULL,         -- 维修人员ID
       type TEXT NOT NULL,                     -- 维修类型（repair/inspection/upgrade）
-      description TEXT,                       -- 维修描述
+      description TEXT,                       -- 维修描述/故障描述
+      fault_cause TEXT DEFAULT '',            -- 故障原因
+      parts_replaced TEXT DEFAULT '',         -- 更换零件
       cost REAL DEFAULT 0,                   -- 维修费用
+      notes TEXT DEFAULT '',                  -- 备注
+      alarm_id INTEGER,                      -- 关联告警ID
       start_time TEXT,                        -- 开始时间
       end_time TEXT,                          -- 结束时间
       status TEXT DEFAULT 'pending',          -- 状态（pending/in_progress/completed）
       created_at TEXT DEFAULT (datetime('now','localtime')),
       FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE,
-      FOREIGN KEY (technician_id) REFERENCES personnel(id)
+      FOREIGN KEY (technician_id) REFERENCES personnel(id),
+      FOREIGN KEY (alarm_id) REFERENCES alarms(id) ON DELETE SET NULL
     )`,
 
-    // 9. 用户表（登录认证）
+    // 9. 用户表（登录认证，多角色支持）
     `CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,           -- 用户名（登录用）
       password TEXT NOT NULL,                  -- 密码
       name TEXT NOT NULL,                      -- 真实姓名
-      role TEXT NOT NULL,                      -- 角色（admin/engineer/operator）
-      roleText TEXT NOT NULL,                  -- 角色中文名
+      roles TEXT NOT NULL DEFAULT '',          -- 多角色，逗号分隔（dashboard_admin,workshop_supervisor,maintenance_tech,viewer）
       createdAt TEXT DEFAULT CURRENT_TIMESTAMP
     )`,
 
@@ -225,6 +222,126 @@ function createTables() {
       name TEXT NOT NULL,
       month TEXT NOT NULL,
       output INTEGER NOT NULL
+    )`,
+
+    // 13. 数据源配置表（看板管理员管理第三方API接口）
+    `CREATE TABLE IF NOT EXISTS data_sources (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,                     -- 数据源名称
+      type TEXT NOT NULL DEFAULT 'api',       -- 类型（api）
+      endpoint TEXT NOT NULL,                 -- API接口地址
+      api_key TEXT DEFAULT '',                -- API密钥
+      headers TEXT DEFAULT '{}',              -- 自定义请求头（JSON）
+      refresh_interval INTEGER DEFAULT 60,    -- 刷新间隔（秒）
+      description TEXT DEFAULT '',            -- 描述
+      status TEXT DEFAULT 'active',           -- 状态（active/inactive）
+      last_test_at TEXT,                      -- 最后测试时间
+      last_test_result TEXT,                  -- 最后测试结果
+      created_at TEXT DEFAULT (datetime('now','localtime')),
+      updated_at TEXT DEFAULT (datetime('now','localtime'))
+    )`,
+
+    // 14. 设备告警规则表（配置设备参数报警阈值）
+    `CREATE TABLE IF NOT EXISTS alarm_rules (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      equipment_id INTEGER NOT NULL,          -- 关联设备ID
+      param_name TEXT NOT NULL,               -- 参数名（temperature/current/voltage/pressure）
+      param_label TEXT NOT NULL DEFAULT '',   -- 参数显示名
+      min_value REAL,                         -- 下限值（null表示不检测下限）
+      max_value REAL,                         -- 上限值（null表示不检测上限）
+      enabled INTEGER DEFAULT 1,              -- 是否启用（1启用/0禁用）
+      notify_level TEXT DEFAULT 'warning',    -- 告警级别（critical/warning/info）
+      created_at TEXT DEFAULT (datetime('now','localtime')),
+      updated_at TEXT DEFAULT (datetime('now','localtime')),
+      FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+    )`,
+
+    // 15. 看板模板表
+    `CREATE TABLE IF NOT EXISTS board_templates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,                     -- 模板名称
+      description TEXT DEFAULT '',            -- 模板描述
+      layout_type TEXT NOT NULL DEFAULT 'single', -- 布局类型（single/double/triple/mixed）
+      thumbnail TEXT DEFAULT '',              -- 缩略图URL
+      config TEXT DEFAULT '{}',               -- 全局配置（JSON）
+      status TEXT DEFAULT 'draft',            -- 状态（draft/published）
+      created_at TEXT DEFAULT (datetime('now','localtime')),
+      updated_at TEXT DEFAULT (datetime('now','localtime'))
+    )`,
+
+    // 16. 组件库表（预定义看板组件）
+    `CREATE TABLE IF NOT EXISTS component_library (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,                     -- 组件名称
+      type TEXT NOT NULL,                     -- 组件类型（data_card/real_table/trend_chart/alarm_list/progress_bar）
+      icon TEXT DEFAULT '',                   -- 图标
+      default_config TEXT DEFAULT '{}',       -- 默认配置（JSON）
+      description TEXT DEFAULT '',            -- 组件描述
+      created_at TEXT DEFAULT (datetime('now','localtime'))
+    )`,
+
+    // 17. 模板-组件关联表
+    `CREATE TABLE IF NOT EXISTS template_components (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      template_id INTEGER NOT NULL,           -- 关联模板ID
+      component_id INTEGER NOT NULL,          -- 关联组件库ID
+      position TEXT NOT NULL DEFAULT '{}',    -- 位置信息（JSON: {row,col,width,height}）
+      config TEXT DEFAULT '{}',               -- 组件配置覆盖（JSON）
+      refresh_interval INTEGER DEFAULT 0,     -- 刷新间隔（秒，0=不刷新）
+      sort_order INTEGER DEFAULT 0,           -- 排序
+      created_at TEXT DEFAULT (datetime('now','localtime')),
+      FOREIGN KEY (template_id) REFERENCES board_templates(id) ON DELETE CASCADE,
+      FOREIGN KEY (component_id) REFERENCES component_library(id) ON DELETE CASCADE
+    )`,
+
+    // 18. 看板实例表（基于模板创建的具体看板）
+    `CREATE TABLE IF NOT EXISTS board_instances (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      template_id INTEGER NOT NULL,           -- 关联模板ID
+      name TEXT NOT NULL,                     -- 实例名称
+      description TEXT DEFAULT '',            -- 描述
+      display_config TEXT DEFAULT '{}',       -- 展示配置（JSON）
+      status TEXT DEFAULT 'draft',            -- 状态（draft/published/offline）
+      refresh_interval INTEGER DEFAULT 30,    -- 刷新间隔（秒）
+      created_at TEXT DEFAULT (datetime('now','localtime')),
+      updated_at TEXT DEFAULT (datetime('now','localtime')),
+      FOREIGN KEY (template_id) REFERENCES board_templates(id) ON DELETE CASCADE
+    )`,
+
+    // 19. 展示终端表
+    `CREATE TABLE IF NOT EXISTS display_terminals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,                     -- 终端名称
+      type TEXT NOT NULL DEFAULT 'pc',        -- 终端类型（pc/large_screen/mobile）
+      location TEXT DEFAULT '',               -- 安装位置
+      resolution TEXT DEFAULT '',             -- 分辨率
+      status TEXT DEFAULT 'offline',          -- 状态（online/offline）
+      bound_instance_id INTEGER,             -- 绑定的看板实例ID
+      last_heartbeat TEXT,                    -- 最后心跳时间
+      created_at TEXT DEFAULT (datetime('now','localtime')),
+      FOREIGN KEY (bound_instance_id) REFERENCES board_instances(id) ON DELETE SET NULL
+    )`,
+    
+    // 20. 用户设备收藏表（普通员工关注设备）
+    `CREATE TABLE IF NOT EXISTS user_favorites (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,               -- 用户ID
+      equipment_id INTEGER NOT NULL,          -- 设备ID
+      created_at TEXT DEFAULT (datetime('now','localtime')),
+      UNIQUE(user_id, equipment_id),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (equipment_id) REFERENCES equipment(id) ON DELETE CASCADE
+    )`,
+
+    // 21. 用户看板分配表（管理员将看板分配给员工）
+    `CREATE TABLE IF NOT EXISTS user_board_assignments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      instance_id INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now','localtime')),
+      UNIQUE(user_id, instance_id),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (instance_id) REFERENCES board_instances(id) ON DELETE CASCADE
     )`
   ];
 
@@ -233,6 +350,11 @@ function createTables() {
       if (err) console.error('❌ 建表失败:', err.message);
     });
   }
+
+  // 迁移：为 user_board_assignments 补充字段（兼容已有数据库）
+  db.run("ALTER TABLE user_board_assignments ADD COLUMN device_type TEXT DEFAULT ''", (err) => { /* 可能已存在 */ });
+  db.run("ALTER TABLE user_board_assignments ADD COLUMN last_active TEXT DEFAULT NULL", (err) => { /* 可能已存在 */ });
+  db.run("ALTER TABLE user_board_assignments ADD COLUMN is_online INTEGER DEFAULT 0", (err) => { /* 可能已存在 */ });
 
   console.log('✅ 数据库表结构已就绪');
 }

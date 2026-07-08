@@ -1,11 +1,22 @@
 <!DOCTYPE html>
+<!-- ============================================================
+     页面：登录/注册页（login.html）
+     功能：用户登录和注册，含角色动画交互
+     - 左侧品牌区：四个动态角色（紫色/黑色/橙色/黄色），瞳孔跟随鼠标
+     - 右侧表单区：登录/注册 Tab 切换
+     - 特色交互：眨眼动画、偷看密码、角色倾斜、输入聚焦联动
+     后端 API：POST /api/auth/login, POST /api/auth/register
+     ============================================================ -->
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>登录 · 智能工厂看板</title>
+    <!-- Font Awesome 6 图标库 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"/>
+    <!-- 页面内联样式（登录页独立，不依赖外部 CSS） -->
     <style>
+        /* ===== CSS Reset ===== */
         * { margin:0; padding:0; box-sizing:border-box; }
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -293,14 +304,15 @@
                         <div class="input-icon"><i class="fas fa-lock"></i><input type="password" id="regConfirmPassword" placeholder="请再次输入密码" /></div>
                     </div>
                     <div class="input-group">
-                        <label>角色</label>
-                        <div class="input-icon">
-                            <i class="fas fa-user-tag"></i>
-                            <select id="regRole">
-                                <option value="operator">👷 产线操作员</option>
-                                <option value="engineer">🔧 设备工程师</option>
-                                <option value="admin">👔 车间主管</option>
-                            </select>
+                        <label>角色 <span style="color:#9a9ab0;font-weight:400;">（可多选）</span></label>
+                        <div class="input-icon" style="position:relative;padding:10px 14px;background:#f5f6fa;border:1.5px solid #e2e4ed;border-radius:14px;">
+                            <i class="fas fa-user-tag" style="position:absolute;left:14px;top:14px;color:#9a9ab0;font-size:16px;"></i>
+                            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-left:28px;" id="roleCheckboxes">
+                                <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;color:#1a1a2e;"><input type="checkbox" value="dashboard_admin" checked> 📋 看板管理员</label>
+                                <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;color:#1a1a2e;"><input type="checkbox" value="workshop_supervisor"> 👔 车间主管</label>
+                                <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;color:#1a1a2e;"><input type="checkbox" value="maintenance_tech"> 🔧 设备维修员</label>
+                                <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;color:#1a1a2e;"><input type="checkbox" value="viewer"> 👤 普通员工</label>
+                            </div>
                         </div>
                     </div>
                     <button type="button" class="btn-login" id="registerBtn">注 册</button>
@@ -310,6 +322,19 @@
         </div>
     </div>
 
+    <!-- ============================================================
+         页面交互 JavaScript（IIFE 自执行）
+         功能：
+         1. Tab 切换（登录/注册）
+         2. 密码显示/隐藏切换
+         3. 角色瞳孔鼠标跟踪
+         4. 角色身体倾斜跟随鼠标
+         5. 随机眨眼动画
+         6. 输入聚焦时角色"互看"联动
+         7. 偷看密码效果
+         8. 角色好奇高度变化
+         9. 登录/注册 API 调用
+         ============================================================ -->
     <script>
     (function(){
         'use strict';
@@ -444,7 +469,20 @@
                 var d=await r.json();
                 if(d.code===0){
                     sessionStorage.setItem('isLoggedIn','true');
+                    // 确保 roles 是数组
+                    if (typeof d.data.roles === 'string') d.data.roles = d.data.roles.split(',').filter(Boolean);
                     sessionStorage.setItem('userInfo',JSON.stringify(d.data));
+                    // 普通员工检查是否有分配的看板
+                    if (d.data.roles && d.data.roles.length === 1 && d.data.roles[0] === 'viewer') {
+                        try {
+                            var checkR = await fetch(API+'/my-assigned-board',{headers:{'X-User-Id':d.data.id}});
+                            var checkD = await checkR.json();
+                            if (checkD.code === 0) {
+                                window.location.href='display.html?assigned=1';
+                                return;
+                            }
+                        } catch(e) {}
+                    }
                     window.location.href='index.html';
                 }else{err.textContent=d.message||'登录失败';err.classList.add('show');}
             }catch(e){err.textContent='服务器连接失败';err.classList.add('show');}
@@ -459,21 +497,34 @@
             var name=document.getElementById('regName').value.trim();
             var password=document.getElementById('regPassword').value.trim();
             var confirm=document.getElementById('regConfirmPassword').value.trim();
-            var role=document.getElementById('regRole').value;
+            // 获取选中的角色（多选）
+            var roleCheckboxes=document.querySelectorAll('#roleCheckboxes input[type="checkbox"]:checked');
+            var roles=Array.from(roleCheckboxes).map(function(cb){return cb.value;});
             var err=document.getElementById('registerError'),succ=document.getElementById('registerSuccess');
             err.classList.remove('show');succ.classList.remove('show');
             if(username.length<3){err.textContent='用户名至少3个字符';err.classList.add('show');return;}
             if(!name){err.textContent='请输入姓名';err.classList.add('show');return;}
             if(password.length<4){err.textContent='密码至少4位';err.classList.add('show');return;}
             if(password!==confirm){err.textContent='两次密码不一致';err.classList.add('show');return;}
+            if(roles.length===0){err.textContent='请至少选择一个角色';err.classList.add('show');return;}
             var btn=document.getElementById('registerBtn');btn.disabled=true;btn.textContent='注册中...';
             try{
-                var r=await fetch(API+'/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,name,password,role})});
+                var r=await fetch(API+'/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,name,password,roles:roles})});
                 var d=await r.json();
                 if(d.code===0){
                     succ.textContent='✅ 注册成功！正在跳转...';succ.classList.add('show');
+                    if (typeof d.data.roles === 'string') d.data.roles = d.data.roles.split(',').filter(Boolean);
                     sessionStorage.setItem('isLoggedIn','true');sessionStorage.setItem('userInfo',JSON.stringify(d.data));
-                    setTimeout(function(){window.location.href='index.html';},1000);
+                    setTimeout(async function(){
+                        if (d.data.roles && d.data.roles.length === 1 && d.data.roles[0] === 'viewer') {
+                            try {
+                                var cr = await fetch(API+'/my-assigned-board',{headers:{'X-User-Id':d.data.id}});
+                                var cd = await cr.json();
+                                if (cd.code === 0) { window.location.href='display.html?assigned=1'; return; }
+                            } catch(e) {}
+                        }
+                        window.location.href='index.html';
+                    },1000);
                 }else{err.textContent=d.message||'注册失败';err.classList.add('show');}
             }catch(e){err.textContent='服务器连接失败';err.classList.add('show');}
             finally{btn.disabled=false;btn.textContent='注 册';}
